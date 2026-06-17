@@ -284,10 +284,10 @@ h3 {
   padding: clamp(0.78rem, 2.35dvh, 1.05rem);
   position: relative;
   overflow: hidden;
-  border: 2px solid #805200;
-  background: linear-gradient(180deg, #fff06a 0%, #ffd43b 58%, #f5a400 100%);
-  box-shadow: 0 5px 0 rgba(111, 76, 0, 0.23), 0 14px 26px rgba(190, 100, 0, 0.16);
-  color: #241700;
+  border: 2px solid rgba(154, 103, 0, 0.78);
+  background: linear-gradient(180deg, #fff4a3 0%, #ffd84d 100%);
+  box-shadow: 0 4px 0 rgba(111, 76, 0, 0.18), 0 10px 20px rgba(128, 86, 0, 0.12);
+  color: #2c1b00;
 }
 
 .lane-button.recommended::after {
@@ -308,76 +308,9 @@ h3 {
 .lane-button.recommended strong {
   position: relative;
   z-index: 1;
-  font-size: clamp(1.82rem, 7vw, 2.65rem);
+  font-size: clamp(1.72rem, 6.7vw, 2.42rem);
   font-weight: 950;
   line-height: 1;
-}
-
-.daily-style-options {
-  width: min(100%, 680px);
-  display: grid;
-  gap: 0.45rem;
-  margin: clamp(0.65rem, 1.9dvh, 1rem) auto 0;
-}
-
-.daily-style-options p {
-  color: var(--muted);
-  font-size: 0.82rem;
-  font-weight: 900;
-  text-align: center;
-  text-transform: uppercase;
-}
-
-.daily-style-grid {
-  display: grid;
-  gap: 0.5rem;
-}
-
-.daily-style-preview {
-  min-height: 76px;
-  display: grid;
-  place-items: center;
-  gap: 0.08rem;
-  padding: 0.68rem;
-  position: relative;
-  overflow: hidden;
-  text-align: center;
-}
-
-.daily-style-preview span {
-  position: relative;
-  z-index: 1;
-  font-size: 0.76rem;
-  font-weight: 900;
-  text-transform: uppercase;
-}
-
-.daily-style-preview strong {
-  position: relative;
-  z-index: 1;
-  font-size: clamp(1.25rem, 4.8vw, 1.72rem);
-  line-height: 1.02;
-}
-
-.daily-style-a {
-  border: 2px solid rgba(154, 103, 0, 0.78);
-  background: linear-gradient(180deg, #fff4a3 0%, #ffd84d 100%);
-  box-shadow: 0 4px 0 rgba(111, 76, 0, 0.18), 0 10px 20px rgba(128, 86, 0, 0.12);
-  color: #2c1b00;
-}
-
-.daily-style-b {
-  border: 2px solid #805200;
-  background: linear-gradient(180deg, #fff06a 0%, #ffd43b 58%, #f5a400 100%);
-  box-shadow: 0 5px 0 rgba(111, 76, 0, 0.23), 0 14px 26px rgba(190, 100, 0, 0.16);
-  color: #241700;
-}
-
-.daily-style-c {
-  border: 2px solid #5f3b00;
-  background: linear-gradient(180deg, #ffef3d 0%, #ffc400 48%, #f08c00 100%);
-  box-shadow: 0 6px 0 rgba(74, 45, 0, 0.27), 0 15px 28px rgba(190, 100, 0, 0.2);
-  color: #1f1000;
 }
 
 .menu-back {
@@ -1412,7 +1345,7 @@ dialog::backdrop {
   .lane-button.recommended {
     min-height: 78px;
     padding: 0.64rem;
-    box-shadow: 0 4px 0 rgba(111, 76, 0, 0.22), 0 10px 20px rgba(190, 100, 0, 0.14);
+    box-shadow: 0 3px 0 rgba(111, 76, 0, 0.18), 0 8px 16px rgba(128, 86, 0, 0.1);
   }
 
   .lane-button strong {
@@ -1420,33 +1353,7 @@ dialog::backdrop {
   }
 
   .lane-button.recommended strong {
-    font-size: clamp(1.55rem, 6.4vw, 2.1rem);
-  }
-
-  .daily-style-options {
-    gap: 0.32rem;
-    margin-top: 0.5rem;
-  }
-
-  .daily-style-options p {
-    font-size: 0.72rem;
-  }
-
-  .daily-style-grid {
-    gap: 0.38rem;
-  }
-
-  .daily-style-preview {
-    min-height: 58px;
-    padding: 0.46rem;
-  }
-
-  .daily-style-preview span {
-    font-size: 0.66rem;
-  }
-
-  .daily-style-preview strong {
-    font-size: clamp(1rem, 4.6vw, 1.28rem);
+    font-size: clamp(1.48rem, 6vw, 2rem);
   }
 
   .learn-card {
@@ -1485,10 +1392,6 @@ dialog::backdrop {
     max-width: 720px;
     margin-left: auto;
     margin-right: auto;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
-  .daily-style-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
