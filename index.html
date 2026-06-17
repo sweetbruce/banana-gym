@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#ffd43b">
+    <title>Banana Gym</title>
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <div class="splash-screen" id="splashScreen" aria-hidden="true">
+      <div class="splash-mark">&#127820;</div>
+    </div>
+
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="brand">
+          <div class="mascot" aria-hidden="true">&#127820;</div>
+          <div class="brand-text">
+            <p class="brand-eyebrow">Brooke's</p>
+            <h1>Banana Gym</h1>
+          </div>
+        </div>
+      </header>
+
+      <main>
+        <section class="practice-panel" id="homeView">
+          <div class="home-menu-panel active" id="homeMenu">
+            <div class="lane-button-grid">
+              <button class="lane-button recommended" id="dailyWorkoutButton" type="button">
+                <strong>Daily Workout</strong>
+                <span>A five-minute circuit through recognition, rescue words, grid shape, and a short time trial.</span>
+              </button>
+              <button class="lane-button" id="practiceDrillsButton" type="button">
+                <strong>Practice Drills</strong>
+                <span>Work one Bananagrams skill at a time without a countdown.</span>
+              </button>
+              <button class="lane-button" id="timeTrialsButton" type="button">
+                <strong>Time Trials</strong>
+                <span>See how many letters you can play in valid words before time runs out.</span>
+              </button>
+              <button class="lane-button" id="settingsButton" type="button">
+                <strong>Settings</strong>
+                <span>Choose enabled drills, difficulty, adaptive focus, and dictionary options.</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="home-menu-panel" id="drillsMenu" aria-hidden="true">
+            <div class="section-heading menu-heading">
+              <div>
+                <h2>Practice Drills</h2>
+              </div>
+            </div>
+            <div class="preset-grid drill-grid" id="presetGrid"></div>
+            <button class="text-button menu-back" type="button" data-home-menu="home">Back</button>
+          </div>
+
+          <div class="home-menu-panel" id="trialsMenu" aria-hidden="true">
+            <div class="section-heading menu-heading">
+              <div>
+                <h2>Time Trials</h2>
+              </div>
+            </div>
+            <div class="preset-grid practice-grid" id="mainPracticeGrid"></div>
+            <button class="text-button menu-back" type="button" data-home-menu="home">Back</button>
+          </div>
+        </section>
+
+        <section class="session-panel hidden" id="sessionView">
+          <div class="session-status">
+            <div>
+              <strong id="currentDrillName">Tile Flash</strong>
+              <p class="session-explainer" id="sessionExplainer"></p>
+              <span id="sessionMeta"></span>
+            </div>
+          </div>
+
+          <div class="board-wrap" id="boardWrap">
+            <div class="board" id="board" aria-label="Practice grid"></div>
+            <div class="tray" id="tray" aria-label="Tile tray"></div>
+            <div class="board-toolbar">
+              <button id="undoButton">Undo</button>
+              <button id="shuffleButton">Shuffle</button>
+              <button id="dumpButton">Trade In</button>
+              <button id="peelButton">Take 1</button>
+            </div>
+            <p class="board-hint" id="boardHint">Tap a tile, then tap an open square.</p>
+          </div>
+
+          <div class="drill-card">
+            <div class="drill-head">
+              <div>
+                <p id="drillKicker">Up first</p>
+                <h2 id="drillTitle">Tile Flash</h2>
+              </div>
+            </div>
+            <p id="drillPrompt"></p>
+            <div id="drillSurface"></div>
+          </div>
+
+          <div class="session-footer">
+            <div class="session-actions" id="sessionActions"></div>
+            <button class="text-button" id="backButton">Back</button>
+          </div>
+        </section>
+
+        <section class="summary-panel hidden" id="summaryView">
+          <div class="summary-card">
+            <div class="mascot large" aria-hidden="true">&#127820;</div>
+            <h2>Round Complete</h2>
+            <p id="summaryText"></p>
+            <div class="metric-grid" id="metricGrid"></div>
+            <div id="summaryDetails"></div>
+            <div class="summary-actions">
+              <button class="primary" id="playAgainButton">Play Again</button>
+              <button id="doneButton">Back to Menu</button>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <dialog id="dailyWorkoutDialog">
+      <div class="workout-ready">
+        <div class="mascot large" aria-hidden="true">&#127820;</div>
+        <h2>5-Min Daily Workout</h2>
+        <p>Four timed exercises will run back to back. Each drill has its own countdown, and the whole workout takes about five minutes.</p>
+        <div class="dialog-actions stacked">
+          <button class="primary" id="startDailyWorkoutButton" type="button">Start Workout</button>
+          <button id="cancelDailyWorkoutButton" type="button">Back</button>
+        </div>
+      </div>
+    </dialog>
+
+    <dialog id="settingsDialog">
+      <form method="dialog" class="settings">
+        <div class="dialog-head">
+          <h2>Practice Settings</h2>
+          <button class="icon-button" value="cancel" aria-label="Close settings">x</button>
+        </div>
+
+        <label class="field">
+          <span>Difficulty</span>
+          <select id="difficultySelect">
+            <option value="friendly">Friendly</option>
+            <option value="casual">Casual</option>
+            <option value="competitive">Competitive</option>
+          </select>
+        </label>
+
+        <label class="toggle-row">
+          <span>Adaptive focus</span>
+          <input type="checkbox" id="adaptiveToggle">
+        </label>
+
+        <div>
+          <h3>Drills</h3>
+          <div class="drill-settings" id="drillSettings"></div>
+        </div>
+
+        <div class="dictionary-settings">
+          <h3>Dictionary</h3>
+          <p id="dictionaryStatus">Built-in Scrabble-style list</p>
+          <input id="dictionaryFileInput" type="file" accept=".txt,.dic,.lst,.words,text/plain" hidden>
+          <div class="dictionary-actions">
+            <button type="button" id="importDictionaryButton">Import word list</button>
+            <button type="button" id="resetDictionaryButton">Use built-in list</button>
+          </div>
+        </div>
+
+        <div class="dialog-actions">
+          <button id="resetSettingsButton" value="cancel">Reset</button>
+          <button class="primary" id="saveSettingsButton" value="default">Save</button>
+        </div>
+      </form>
+    </dialog>
+
+    <script src="scrabble-word-list.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>
