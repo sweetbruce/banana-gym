@@ -236,7 +236,6 @@ const els = {
   shuffleButton: document.querySelector("#shuffleButton"),
   dumpButton: document.querySelector("#dumpButton"),
   peelButton: document.querySelector("#peelButton"),
-  summaryText: document.querySelector("#summaryText"),
   metricGrid: document.querySelector("#metricGrid"),
   summaryDetails: document.querySelector("#summaryDetails"),
   sessionActions: document.querySelector("#sessionActions")
@@ -587,7 +586,6 @@ function playAgain() {
 function renderSummary() {
   els.summaryView.dataset.drill = state.session?.drillId || "";
   els.summaryView.dataset.mode = state.session?.mode || "";
-  els.summaryText.textContent = summaryLine();
   els.summaryDetails.innerHTML = "";
   const current = state.session;
   const metrics = current?.drillId === "peel"
@@ -1218,7 +1216,7 @@ function renderTroubleSummaryDetails(session) {
 
 function renderWordPills(words, emptyLabel = "None") {
   if (!words.length) return `<span>${emptyLabel}</span>`;
-  const visible = words.slice(0, 28);
+  const visible = words.slice(0, 16);
   const overflow = words.length - visible.length;
   return `${visible.map((word) => `<span class="word-pill">${escapeHtml(word)}</span>`).join("")}${overflow > 0 ? `<span class="word-pill">+${overflow}</span>` : ""}`;
 }
