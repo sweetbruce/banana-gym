@@ -4,6 +4,7 @@ const DRILLS = {
   trouble: { name: "Trouble Tile", short: "Find rescue words for awkward letters." },
   flex: { name: "Hooks & Crosses", short: "Build boards with growth points and crossings." },
   peel: { name: "Main Practice", short: "Use every tile, then take one more." },
+  learn: { name: "Learn to Play", short: "A guided tour of the basic rules." },
   rebuild: { name: "Rebuild Challenge", short: "Repair a messy grid." },
   review: { name: "Word Bank Review", short: "Revisit missed words." }
 };
@@ -38,6 +39,65 @@ const DAILY_WORKOUT_BOARD_STEPS = [
 const DAILY_WORKOUT_TIME_TRIAL = { id: "peel", seconds: 90, short: "Finish with a time trial." };
 
 const DRILL_ORDER = ["flash", "trouble", "glue", "flex"];
+
+const LEARN_STEPS = [
+  {
+    key: "intro",
+    title: "Goal of the Game",
+    copy: "Build your own connected crossword grid. Every word on the board should be valid, and the round keeps growing as players take more tiles.",
+    goal: "Read the goal, then start with a simple word.",
+    action: "Start Lesson",
+    board: false
+  },
+  {
+    key: "first-word",
+    title: "Make Your First Word",
+    copy: "Tap a tile, then tap an open square. Use C, A, and T to make CAT in one row.",
+    goal: "Make CAT as one connected word.",
+    waiting: "Make CAT on the board to continue.",
+    action: "Next"
+  },
+  {
+    key: "cross-word",
+    title: "Cross an Existing Word",
+    copy: "Words can share letters like a crossword. Use R and T under the A in CAT to make ART going down.",
+    goal: "Make ART crossing through the A.",
+    waiting: "Make ART using the shared A to continue.",
+    action: "Next"
+  },
+  {
+    key: "invalid",
+    title: "Watch for Red Tiles",
+    copy: "Banana Gym checks the board after every move. Put Q and Z next to each other to see how invalid words get marked red.",
+    goal: "Create one red invalid word.",
+    waiting: "Place Q beside Z to trigger the red invalid highlight.",
+    action: "Next"
+  },
+  {
+    key: "trade",
+    title: "Trade In a Tough Tile",
+    copy: "If a tile is blocking you, select it and tap Trade In. In Bananagrams this swaps one tile for three from the bunch.",
+    goal: "Select Q, then tap Trade In.",
+    waiting: "Select Q and use Trade In to continue.",
+    action: "Next"
+  },
+  {
+    key: "take-one",
+    title: "Take 1 When Empty",
+    copy: "When your tray is empty and every tile is played, call Take 1. Everyone takes one new tile and keeps building.",
+    goal: "Tap Take 1 with an empty tray.",
+    waiting: "Tap Take 1 to draw one new tile.",
+    action: "Next"
+  },
+  {
+    key: "finish",
+    title: "Ready for Banana Gym",
+    copy: "You have the basics: make valid connected words, cross through existing letters, trade in stuck tiles, and take one when your tray is empty.",
+    goal: "Jump into a workout or pick one drill to practice.",
+    action: "Back to Menu",
+    board: false
+  }
+];
 
 const TROUBLE_RESCUES = {
   J: ["JO", "JOT", "JAM", "JAR", "JAW", "JET", "JIG", "JOG", "JOY", "JUG", "JUNE"],
@@ -209,6 +269,7 @@ const els = {
   dailyWorkoutButton: document.querySelector("#dailyWorkoutButton"),
   practiceDrillsButton: document.querySelector("#practiceDrillsButton"),
   timeTrialsButton: document.querySelector("#timeTrialsButton"),
+  learnToPlayButton: document.querySelector("#learnToPlayButton"),
   mainPracticeGrid: document.querySelector("#mainPracticeGrid"),
   presetGrid: document.querySelector("#presetGrid"),
   settingsButton: document.querySelector("#settingsButton"),
@@ -272,6 +333,7 @@ function bindEvents() {
   els.dailyWorkoutButton.addEventListener("click", openDailyWorkoutIntro);
   els.practiceDrillsButton.addEventListener("click", () => showHomeMenu("drills"));
   els.timeTrialsButton.addEventListener("click", () => showHomeMenu("trials"));
+  els.learnToPlayButton.addEventListener("click", startLearnToPlay);
   els.startDailyWorkoutButton.addEventListener("click", () => {
     els.dailyWorkoutDialog.close();
     startDailyWorkout();
@@ -461,6 +523,18 @@ function startDrill(id) {
   showView("session");
 }
 
+function startLearnToPlay() {
+  state.workout = null;
+  state.pendingWorkoutStep = null;
+  state.session = createSession("learn", {
+    mode: "learn",
+    learnStep: 0,
+    learnStepKey: ""
+  });
+  loadDrill("learn");
+  showView("session");
+}
+
 function createSession(id, overrides = {}) {
   return {
     drillId: id,
@@ -487,7 +561,7 @@ function loadDrill(id) {
   els.drillTitle.textContent = title;
   els.drillKicker.textContent = isDaily
     ? `Step ${state.session.workoutIndex + 1} of ${state.session.workoutTotal}`
-    : state.session.mode === "main" ? "Take 1 Challenge" : "Practice Drill";
+    : state.session.mode === "learn" ? "Guided Lesson" : state.session.mode === "main" ? "Take 1 Challenge" : "Practice Drill";
   const usesTimer = state.session.mode === "main" || (isDaily && state.session.timeLimitSeconds);
   setSessionMeta(
     usesTimer ? formatTime(state.session.timeLimitSeconds) : isDaily ? `${state.session.workoutIndex + 1}/${state.session.workoutTotal}` : "",
@@ -496,7 +570,8 @@ function loadDrill(id) {
   els.drillSurface.innerHTML = "";
   els.sessionActions.innerHTML = "";
   els.sessionExplainer.textContent = "";
-  document.querySelector("#boardWrap").classList.toggle("hidden", !["glue", "flex", "peel", "rebuild"].includes(id));
+  clearLearnHighlights();
+  document.querySelector("#boardWrap").classList.toggle("hidden", !["glue", "flex", "peel", "rebuild", "learn"].includes(id));
   window.scrollTo({ top: 0, behavior: "smooth" });
 
   if (id === "flash") renderFlash();
@@ -504,6 +579,7 @@ function loadDrill(id) {
   if (id === "trouble") renderTrouble();
   if (id === "flex") renderFlex();
   if (id === "peel") renderPeel();
+  if (id === "learn") renderLearn();
   if (id === "rebuild") renderRebuild();
   if (id === "review") renderReview();
   els.sessionExplainer.textContent = els.drillPrompt.textContent;
@@ -1101,6 +1177,187 @@ function renderReview() {
   els.drillSurface.innerHTML = `<div class="letter-row">${missed.map((word) => `<span class="letter-chip">${word}</span>`).join("")}</div>`;
 }
 
+function renderLearn() {
+  const step = getCurrentLearnStep();
+  if (!step) return finishLearnToPlay();
+
+  if (state.session.learnStepKey !== step.key) setupLearnStep(step);
+
+  els.currentDrillName.textContent = "Learn to Play";
+  els.drillTitle.textContent = step.title;
+  els.drillPrompt.textContent = step.copy;
+  els.sessionExplainer.textContent = step.copy;
+  setSessionMeta(`${state.session.learnStep + 1}/${LEARN_STEPS.length}`, {});
+  document.querySelector("#boardWrap").classList.toggle("hidden", step.board === false);
+  updateLearnControlFocus(step);
+  updateLearnTargets(step);
+
+  els.drillSurface.innerHTML = `
+    <div class="learn-card" id="learnCard">
+      <span class="learn-step-label">Step ${state.session.learnStep + 1} of ${LEARN_STEPS.length}</span>
+      <h2>${escapeHtml(step.title)}</h2>
+      <p>${escapeHtml(step.copy)}</p>
+      <div class="learn-goal">
+        <strong>Goal</strong>
+        <span id="learnGoalStatus">${escapeHtml(step.goal)}</span>
+      </div>
+    </div>
+  `;
+  els.sessionActions.innerHTML = `<button id="learnNext" class="primary">${escapeHtml(step.action)}</button>`;
+  document.querySelector("#learnNext").addEventListener("click", goToNextLearnStep);
+  updateLearnProgress();
+}
+
+function setupLearnStep(step) {
+  state.session.learnStepKey = step.key;
+  state.session.learnStartDumps = state.session.dumps || 0;
+  state.session.learnStartPeels = state.session.peels || 0;
+  state.session.learnStepComplete = false;
+  state.hintOverride = null;
+
+  if (step.key === "intro" || step.key === "finish") {
+    resetTiles(0);
+    return;
+  }
+
+  if (step.key === "first-word") {
+    resetTiles(3, ["C", "A", "T"]);
+    return;
+  }
+
+  if (step.key === "cross-word") {
+    resetTiles(2, ["R", "T"]);
+    placeStarterWord("CAT", 5, 4, "across", true);
+    return;
+  }
+
+  if (step.key === "invalid") {
+    resetTiles(2, ["Q", "Z"]);
+    return;
+  }
+
+  if (step.key === "trade") {
+    resetTiles(1, ["Q"]);
+    return;
+  }
+
+  if (step.key === "take-one") {
+    resetTiles(0);
+    placeStarterWord("CAT", 5, 4, "across", true);
+  }
+}
+
+function getCurrentLearnStep() {
+  if (!state.session || state.session.drillId !== "learn") return null;
+  return LEARN_STEPS[state.session.learnStep] || null;
+}
+
+function goToNextLearnStep() {
+  const step = getCurrentLearnStep();
+  if (!step) return;
+
+  if (!isLearnStepComplete(step)) {
+    showBoardHint(step.waiting || step.goal);
+    updateLearnProgress();
+    return;
+  }
+
+  if (state.session.learnStep >= LEARN_STEPS.length - 1) {
+    finishLearnToPlay();
+    return;
+  }
+
+  state.session.learnStep += 1;
+  state.session.learnStepKey = "";
+  renderLearn();
+}
+
+function finishLearnToPlay() {
+  clearLearnHighlights();
+  state.session = null;
+  showView("home");
+  showHomeMenu("home");
+  renderHome();
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function updateLearnProgress() {
+  const step = getCurrentLearnStep();
+  if (!step) return;
+
+  const complete = isLearnStepComplete(step);
+  const button = document.querySelector("#learnNext");
+  const status = document.querySelector("#learnGoalStatus");
+  const card = document.querySelector("#learnCard");
+
+  if (button) {
+    button.disabled = !complete;
+    button.textContent = step.action;
+  }
+
+  if (status) status.textContent = complete ? getLearnCompleteText(step) : step.goal;
+  if (card) card.classList.toggle("complete", complete);
+  state.session.learnStepComplete = complete;
+}
+
+function isLearnStepComplete(step) {
+  if (!state.session || state.session.drillId !== "learn") return false;
+  if (step.key === "intro" || step.key === "finish") return true;
+  if (step.key === "first-word") return learnCellsSpell([learnIndex(5, 4), learnIndex(5, 5), learnIndex(5, 6)], "CAT") && !getInvalidCells().size;
+  if (step.key === "cross-word") return learnCellsSpell([learnIndex(5, 5), learnIndex(6, 5), learnIndex(7, 5)], "ART") && !getInvalidCells().size;
+  if (step.key === "invalid") return learnCellsOccupied([learnIndex(5, 5), learnIndex(5, 6)]) && getInvalidCells().size > 0;
+  if (step.key === "trade") return (state.session.dumps || 0) > (state.session.learnStartDumps || 0);
+  if (step.key === "take-one") return (state.session.peels || 0) > (state.session.learnStartPeels || 0);
+  return false;
+}
+
+function learnIndex(row, col) {
+  return row * BOARD_SIZE + col;
+}
+
+function learnCellsSpell(cells, text) {
+  return cells.map((index) => state.board[index]?.letter || "").join("") === text;
+}
+
+function learnCellsOccupied(cells) {
+  return cells.every((index) => state.board[index]);
+}
+
+function updateLearnTargets(step) {
+  Array.from(els.board.children).forEach((cell) => cell.classList.remove("learn-target"));
+  getLearnTargetCells(step).forEach((index) => {
+    els.board.children[index]?.classList.add("learn-target");
+  });
+}
+
+function getLearnTargetCells(step) {
+  if (step.key === "first-word") return [learnIndex(5, 4), learnIndex(5, 5), learnIndex(5, 6)];
+  if (step.key === "cross-word") return [learnIndex(6, 5), learnIndex(7, 5)];
+  if (step.key === "invalid") return [learnIndex(5, 5), learnIndex(5, 6)];
+  return [];
+}
+
+function getLearnCompleteText(step) {
+  if (step.key === "intro") return "Ready.";
+  if (step.key === "invalid") return "Red invalid word spotted.";
+  if (step.key === "trade") return "Tile traded in for three new tiles.";
+  if (step.key === "take-one") return "Take 1 added a new tile.";
+  if (step.key === "finish") return "Lesson complete.";
+  return "Nice. You can continue.";
+}
+
+function updateLearnControlFocus(step) {
+  clearLearnHighlights();
+  if (step.key === "trade") els.dumpButton.classList.add("learn-highlight");
+  if (step.key === "take-one") els.peelButton.classList.add("learn-highlight");
+}
+
+function clearLearnHighlights() {
+  [els.undoButton, els.shuffleButton, els.dumpButton, els.peelButton].forEach((button) => {
+    button.classList.remove("learn-highlight");
+  });
+}
+
 function bindWordInput(letters, options = {}) {
   const input = document.querySelector("#wordInput");
   const submit = document.querySelector("#submitWord");
@@ -1381,6 +1638,7 @@ function renderTiles() {
   updateBoardHint();
   updateFlexScore();
   updateGlueStatus();
+  updateLearnProgress();
 }
 
 function updateFlexScore() {
