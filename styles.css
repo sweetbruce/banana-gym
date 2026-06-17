@@ -280,11 +280,24 @@ h3 {
 }
 
 .lane-button.recommended {
-  min-height: clamp(82px, 13dvh, 112px);
-  border: 2px solid #9a6700;
-  background: linear-gradient(180deg, #ffe066 0%, #ffd43b 54%, #f59f00 100%);
-  box-shadow: 0 6px 0 rgba(111, 76, 0, 0.24), 0 16px 28px rgba(128, 86, 0, 0.16);
-  color: #241800;
+  min-height: clamp(104px, 16dvh, 148px);
+  padding: clamp(0.95rem, 2.8dvh, 1.35rem);
+  position: relative;
+  overflow: hidden;
+  border: 3px solid #4a2d00;
+  border-radius: 6px;
+  background: linear-gradient(180deg, #fff238 0%, #ffd000 42%, #ff9f00 72%, #f76707 100%);
+  box-shadow: 0 8px 0 rgba(74, 45, 0, 0.35), 0 20px 36px rgba(190, 100, 0, 0.28);
+  color: #211100;
+}
+
+.lane-button.recommended::after {
+  content: "";
+  position: absolute;
+  inset: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.52);
+  border-radius: 4px;
+  pointer-events: none;
 }
 
 .lane-button strong {
@@ -294,8 +307,11 @@ h3 {
 }
 
 .lane-button.recommended strong {
-  font-size: clamp(1.76rem, 6.8vw, 2.55rem);
+  position: relative;
+  z-index: 1;
+  font-size: clamp(2.05rem, 8vw, 3.2rem);
   font-weight: 950;
+  line-height: 0.98;
 }
 
 .menu-back {
@@ -1328,8 +1344,9 @@ dialog::backdrop {
   }
 
   .lane-button.recommended {
-    min-height: 68px;
-    box-shadow: 0 4px 0 rgba(111, 76, 0, 0.22), 0 10px 20px rgba(128, 86, 0, 0.12);
+    min-height: 88px;
+    padding: 0.72rem;
+    box-shadow: 0 6px 0 rgba(74, 45, 0, 0.3), 0 14px 24px rgba(190, 100, 0, 0.18);
   }
 
   .lane-button strong {
@@ -1337,7 +1354,7 @@ dialog::backdrop {
   }
 
   .lane-button.recommended strong {
-    font-size: clamp(1.5rem, 6vw, 2rem);
+    font-size: clamp(1.75rem, 7vw, 2.35rem);
   }
 
   .learn-card {
