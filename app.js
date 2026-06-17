@@ -1,5 +1,5 @@
 const DRILLS = {
-  flash: { name: "Tile Flash", short: "Find fast words from loose tiles." },
+  flash: { name: "Tile Rush", short: "Find fast words from loose tiles." },
   glue: { name: "Glue Words", short: "Place short connector words." },
   trouble: { name: "Trouble Tile", short: "Find rescue words for awkward letters." },
   flex: { name: "Hooks & Crosses", short: "Build boards with growth points and crossings." },
@@ -25,12 +25,17 @@ const MAIN_PRACTICE_PRESETS = [
   { label: "10 min", seconds: 600, short: "A longer table-rhythm challenge." }
 ];
 
-const DAILY_WORKOUT_STEPS = [
-  { id: "flash", seconds: 60, short: "Warm up word recognition." },
-  { id: "trouble", seconds: 60, short: "Practice rescue letters.", troubleProfile: "Messy Hand" },
-  { id: "flex", seconds: 90, short: "Build a flexible board." },
-  { id: "peel", seconds: 90, short: "Finish with a short time trial." }
+const DAILY_WORKOUT_OPENING_STEPS = [
+  { id: "flash", seconds: 30, short: "Warm up word recognition." },
+  { id: "trouble", seconds: 30, short: "Practice rescue letters.", troubleProfile: "Messy Hand" }
 ];
+
+const DAILY_WORKOUT_BOARD_STEPS = [
+  { id: "glue", seconds: 30, short: "Connect word islands." },
+  { id: "flex", seconds: 30, short: "Build hooks and crosses." }
+];
+
+const DAILY_WORKOUT_TIME_TRIAL = { id: "peel", seconds: 90, short: "Finish with a time trial." };
 
 const DRILL_ORDER = ["flash", "trouble", "glue", "flex"];
 
@@ -404,11 +409,19 @@ function startMainPractice(seconds) {
 
 function startDailyWorkout() {
   state.workout = {
-    steps: DAILY_WORKOUT_STEPS,
+    steps: buildDailyWorkoutSteps(),
     startedAt: Date.now()
   };
   state.pendingWorkoutStep = null;
   startWorkoutStep(0);
+}
+
+function buildDailyWorkoutSteps() {
+  return [
+    ...DAILY_WORKOUT_OPENING_STEPS,
+    randomItem(DAILY_WORKOUT_BOARD_STEPS),
+    DAILY_WORKOUT_TIME_TRIAL
+  ];
 }
 
 function startWorkoutStep(index) {
