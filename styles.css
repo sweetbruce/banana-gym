@@ -280,15 +280,22 @@ h3 {
 }
 
 .lane-button.recommended {
-  min-height: clamp(72px, 11.5dvh, 96px);
-  border-color: rgba(245, 159, 0, 0.55);
-  background: linear-gradient(180deg, #fff6c4, #fffdfa);
+  min-height: clamp(82px, 13dvh, 112px);
+  border: 2px solid #9a6700;
+  background: linear-gradient(180deg, #ffe066 0%, #ffd43b 54%, #f59f00 100%);
+  box-shadow: 0 6px 0 rgba(111, 76, 0, 0.24), 0 16px 28px rgba(128, 86, 0, 0.16);
+  color: #241800;
 }
 
 .lane-button strong {
   display: block;
   font-size: clamp(1.45rem, 5.9vw, 2.15rem);
   line-height: 1.05;
+}
+
+.lane-button.recommended strong {
+  font-size: clamp(1.76rem, 6.8vw, 2.55rem);
+  font-weight: 950;
 }
 
 .menu-back {
@@ -1320,8 +1327,17 @@ dialog::backdrop {
     padding: 0.52rem;
   }
 
+  .lane-button.recommended {
+    min-height: 68px;
+    box-shadow: 0 4px 0 rgba(111, 76, 0, 0.22), 0 10px 20px rgba(128, 86, 0, 0.12);
+  }
+
   .lane-button strong {
     font-size: clamp(1.35rem, 5.5vw, 1.8rem);
+  }
+
+  .lane-button.recommended strong {
+    font-size: clamp(1.5rem, 6vw, 2rem);
   }
 
   .learn-card {
