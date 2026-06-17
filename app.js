@@ -202,6 +202,7 @@ const els = {
   homeView: document.querySelector("#homeView"),
   sessionView: document.querySelector("#sessionView"),
   summaryView: document.querySelector("#summaryView"),
+  summaryTitle: document.querySelector("#summaryTitle"),
   homeMenu: document.querySelector("#homeMenu"),
   drillsMenu: document.querySelector("#drillsMenu"),
   trialsMenu: document.querySelector("#trialsMenu"),
@@ -410,6 +411,7 @@ function startMainPractice(seconds) {
 function startDailyWorkout() {
   state.workout = {
     steps: buildDailyWorkoutSteps(),
+    results: [],
     startedAt: Date.now()
   };
   state.pendingWorkoutStep = null;
@@ -546,6 +548,7 @@ function completeRound() {
   state.stats.lettersPlaced = (state.stats.lettersPlaced || 0) + state.session.lettersPlaced;
   saveAll();
   const nextWorkoutStep = getNextWorkoutStep(state.session);
+  if (state.session.mode === "daily") recordWorkoutResult(state.session);
   state.pendingWorkoutStep = nextWorkoutStep;
   renderSummary();
   state.lastRound = getRoundConfig(state.session);
@@ -558,6 +561,57 @@ function getNextWorkoutStep(session) {
   if (session.mode !== "daily" || !state.workout) return null;
   const nextIndex = session.workoutIndex + 1;
   return nextIndex < state.workout.steps.length ? nextIndex : null;
+}
+
+function recordWorkoutResult(session) {
+  if (!state.workout) return;
+  const result = makeWorkoutResult(session);
+  state.workout.results = state.workout.results || [];
+  state.workout.results[session.workoutIndex] = result;
+}
+
+function makeWorkoutResult(session) {
+  const title = session.drillId === "peel" ? "Time Trial" : DRILLS[session.drillId]?.name || "Drill";
+  if (session.drillId === "flash") {
+    return {
+      title,
+      score: formatPercent(session.flashFoundCount || 0, session.flashPossibleCount || 0),
+      detail: `${session.flashFoundCount || 0}/${session.flashPossibleCount || 0} words found`
+    };
+  }
+  if (session.drillId === "trouble") {
+    return {
+      title,
+      score: formatPercent(session.troubleFoundCount || 0, session.troublePossibleCount || 0),
+      detail: `${session.troubleFoundCount || 0}/${session.troublePossibleCount || 0} rescue words for ${session.troubleLetter || "-"}`
+    };
+  }
+  if (session.drillId === "glue") {
+    return {
+      title,
+      score: session.glueSolved ? "Done" : `${session.glueComponents || 0} islands`,
+      detail: session.glueSolved ? "Connected the board" : `${session.glueInvalidTiles || 0} invalid tiles`
+    };
+  }
+  if (session.drillId === "flex") {
+    return {
+      title,
+      score: session.flexScore?.score || 0,
+      detail: `${getFlexMetric(session.flexScore, "hooks")} hooks, ${getFlexMetric(session.flexScore, "crosses")} crosses`
+    };
+  }
+  if (session.drillId === "peel") {
+    return {
+      title,
+      score: session.lettersPlaced || 0,
+      detail: `${session.invalidTiles || 0} invalid, ${session.peels || 0} Take 1`
+    };
+  }
+  return {
+    title,
+    score: session.words || 0,
+    detail: "Completed"
+  };
 }
 
 function exitToHome() {
@@ -601,6 +655,8 @@ function renderSummary() {
   els.summaryView.dataset.mode = state.session?.mode || "";
   els.summaryDetails.innerHTML = "";
   const current = state.session;
+  const isFinalDailySummary = current?.mode === "daily" && state.pendingWorkoutStep === null;
+  els.summaryTitle.textContent = isFinalDailySummary ? "Workout Complete" : "Round Complete";
   const metrics = current?.drillId === "peel"
     ? [
         ["Score", current.lettersPlaced || 0],
@@ -643,14 +699,30 @@ function renderSummary() {
   if (current?.drillId === "flex") renderFlexSummaryDetails(current);
   if (current?.drillId === "flash") renderFlashSummaryDetails(current);
   if (current?.drillId === "trouble") renderTroubleSummaryDetails(current);
+  if (isFinalDailySummary) renderWorkoutSummaryDetails();
 
   if (current?.mode === "daily") {
-    els.playAgainButton.textContent = state.pendingWorkoutStep !== null ? "Next Exercise" : "Repeat Daily Workout";
+    els.playAgainButton.textContent = state.pendingWorkoutStep !== null ? "Next Exercise" : "Repeat 3-Min Workout";
     els.doneButton.textContent = "Back to Menu";
   } else {
     els.playAgainButton.textContent = "Play Again";
     els.doneButton.textContent = "Back to Menu";
   }
+}
+
+function renderWorkoutSummaryDetails() {
+  const results = (state.workout?.results || []).filter(Boolean);
+  els.summaryDetails.innerHTML = `
+    <div class="workout-summary-list">
+      ${results.map((result) => `
+        <div class="workout-summary-item">
+          <strong>${escapeHtml(result.title)}</strong>
+          <span>${escapeHtml(String(result.score))}</span>
+          <p>${escapeHtml(result.detail)}</p>
+        </div>
+      `).join("")}
+    </div>
+  `;
 }
 
 function summaryLine() {

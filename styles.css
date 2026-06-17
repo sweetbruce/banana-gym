@@ -934,6 +934,40 @@ h3 {
   gap: 0.28rem;
 }
 
+.workout-summary-list {
+  display: grid;
+  gap: 0.45rem;
+  margin-top: 0.55rem;
+}
+
+.workout-summary-item {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.15rem 0.6rem;
+  padding: 0.52rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fffdfa;
+  text-align: left;
+}
+
+.workout-summary-item strong {
+  font-size: 0.95rem;
+}
+
+.workout-summary-item span {
+  color: var(--ink);
+  font-size: 1.05rem;
+  font-weight: 950;
+}
+
+.workout-summary-item p {
+  grid-column: 1 / -1;
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.25;
+}
+
 dialog {
   width: min(92vw, 520px);
   max-height: min(86vh, 680px);
