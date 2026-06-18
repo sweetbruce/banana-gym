@@ -262,6 +262,16 @@ h3 {
   text-align: center;
 }
 
+.menu-instruction {
+  width: min(100%, 680px);
+  margin: 0 auto clamp(0.38rem, 1.2dvh, 0.62rem);
+  color: var(--muted);
+  font-size: clamp(0.88rem, 3.3vw, 1rem);
+  font-style: italic;
+  line-height: 1.25;
+  text-align: center;
+}
+
 .lane-button-grid {
   width: min(100%, 680px);
   display: grid;
