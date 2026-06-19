@@ -19,10 +19,41 @@ const DEFAULT_SETTINGS = {
   }
 };
 
-const MAIN_PRACTICE_PRESETS = [
-  { label: "2 min", seconds: 120, short: "A quick Take 1 sprint." },
-  { label: "5 min", seconds: 300, short: "The everyday sweet spot." },
-  { label: "10 min", seconds: 600, short: "A longer table-rhythm challenge." }
+const TIME_TRIAL_SECONDS = 120;
+
+const TIME_TRIAL_MODES = [
+  {
+    mode: "words",
+    id: "peel",
+    label: "Words Trial",
+    practiceTitle: "Words Trial",
+    short: "2 min. Score every valid word on the board.",
+    prompt: "Build fast. Your score is the number of valid words on the board."
+  },
+  {
+    mode: "letters",
+    id: "peel",
+    label: "Letters Trial",
+    practiceTitle: "Letters Trial",
+    short: "2 min. Score every valid letter you place.",
+    prompt: "Build fast. Your score is the number of valid letters on the board."
+  },
+  {
+    mode: "scrabble",
+    id: "peel",
+    label: "Score Trial",
+    practiceTitle: "Score Trial",
+    short: "2 min. Score valid words using Scrabble letter values.",
+    prompt: "Build higher-value words. Your score uses Scrabble letter values without board multipliers."
+  },
+  {
+    mode: "flex",
+    id: "flex",
+    label: "Hooks & Crosses Trial",
+    practiceTitle: "Hooks & Crosses Trial",
+    short: "2 min. Build the most flexible board you can.",
+    prompt: "Build a board with open hooks and crosses. Your board score is the target."
+  }
 ];
 
 const DAILY_TILE_RUSH_POOL = [
@@ -35,18 +66,22 @@ const DAILY_TROUBLE_POOL = [
   { id: "trouble", seconds: 90, short: "Practice trouble tiles.", troubleProfile: "Messy Hand", dailyKey: "trouble", practiceTitle: "Trouble Tile" }
 ];
 
-const DAILY_WORKOUT_FINISHERS = [
-  { id: "flex", seconds: 120, short: "Build hooks and crosses.", dailyKey: "flex", practiceTitle: "Hooks & Crosses" },
-  { id: "peel", seconds: 120, short: "Finish with a time trial.", dailyKey: "peel", practiceTitle: "Time Trial" }
-];
+const DAILY_WORKOUT_FINISHERS = TIME_TRIAL_MODES;
 
 const DRILL_ORDER = ["flash", "trouble", "flex"];
+const TROUBLE_LETTERS = ["J", "Q", "X", "Z", "K", "V"];
 
 const PRACTICE_DRILL_OPTIONS = [
   { id: "flash", label: "Tile Rush: 2-Letter", short: "Find every 2-letter word in the hand.", wordMode: "twos" },
   { id: "flash", label: "Tile Rush: 3-Letter", short: "Find every 3-letter word in the hand.", wordMode: "threes" },
   { id: "flash", label: "Tile Rush: All Words", short: "Larger hand. Find every valid word you can make.", wordMode: "all" },
-  { id: "trouble", label: "Trouble Tile", short: "Find words that use an awkward tile.", troubleProfile: null },
+  ...TROUBLE_LETTERS.map((letter) => ({
+    id: "trouble",
+    label: `Trouble Tile: ${letter}`,
+    short: `Find words that rescue ${letter}.`,
+    troubleLetter: letter,
+    troubleProfile: "Messy Hand"
+  })),
   { id: "flex", label: "Hooks & Crosses", short: "Build boards with growth points and crossings." }
 ];
 
@@ -157,8 +192,6 @@ const LEARN_STEPS = [
   }
 ];
 
-const TROUBLE_LETTERS = ["J", "Q", "X", "Z", "K", "V"];
-
 const TROUBLE_RACK_PROFILES = [
   { label: "Obvious", rackSize: 5, seedCount: 2, minPossible: 1, maxPossible: 10 },
   { label: "Easy", rackSize: 7, seedCount: 3, minPossible: 3, maxPossible: 16 },
@@ -211,6 +244,11 @@ const GLUE_DISTRACTOR_COUNT = 2;
 const TILE_DISTRIBUTION = {
   A: 13, B: 3, C: 3, D: 6, E: 18, F: 3, G: 4, H: 3, I: 12, J: 2, K: 2, L: 5, M: 3,
   N: 8, O: 11, P: 3, Q: 2, R: 9, S: 6, T: 9, U: 6, V: 3, W: 3, X: 2, Y: 3, Z: 2
+};
+
+const SCRABBLE_TILE_VALUES = {
+  A: 1, B: 3, C: 3, D: 2, E: 1, F: 4, G: 2, H: 4, I: 1, J: 8, K: 5, L: 1, M: 3,
+  N: 1, O: 1, P: 3, Q: 10, R: 1, S: 1, T: 1, U: 1, V: 4, W: 4, X: 8, Y: 4, Z: 10
 };
 
 const WORDS = [
@@ -370,7 +408,6 @@ init();
 function init() {
   startSplashIntro();
   renderHome();
-  renderMainMenuTileLabels();
   renderSettings();
   renderDictionaryStatus();
   initBoard();
@@ -385,17 +422,6 @@ function startSplashIntro() {
   window.setTimeout(() => {
     els.splashScreen.classList.add("hidden");
   }, 1150);
-}
-
-function renderMainMenuTileLabels() {
-  document.querySelectorAll("[data-tile-label]").forEach((title) => {
-    const label = title.dataset.tileLabel || title.textContent || "";
-    title.innerHTML = label.trim().split(/\s+/).map((word) => `
-      <span class="tile-word">
-        ${[...word].map((char) => `<span class="menu-letter-tile">${escapeHtml(char)}</span>`).join("")}
-      </span>
-    `).join("");
-  });
 }
 
 function bindEvents() {
@@ -498,11 +524,11 @@ function playUiSound(kind) {
 
 function renderHome() {
   els.mainPracticeGrid.innerHTML = "";
-  MAIN_PRACTICE_PRESETS.forEach((preset, index) => {
+  TIME_TRIAL_MODES.forEach((trial) => {
     const button = document.createElement("button");
     button.className = "preset-card";
-    button.innerHTML = `<strong>${preset.label}</strong><span>${preset.short}</span>`;
-    button.addEventListener("click", () => startMainPractice(preset.seconds));
+    button.innerHTML = `<strong>${trial.label}</strong><span>${trial.short}</span>`;
+    button.addEventListener("click", () => startTimeTrial(trial));
     els.mainPracticeGrid.append(button);
   });
 
@@ -576,20 +602,46 @@ function saveSettingsFromDialog() {
   renderHome();
 }
 
-function startMainPractice(seconds) {
+function buildTimeTrialStep(trial, seconds = TIME_TRIAL_SECONDS) {
+  const step = {
+    id: trial.id,
+    seconds,
+    short: trial.short,
+    dailyKey: `trial-${trial.mode}`,
+    practiceTitle: trial.practiceTitle,
+    timeTrialMode: trial.mode,
+    timeTrialLabel: trial.label,
+    timeTrialPrompt: trial.prompt
+  };
+  if (trial.id === "peel") step.fixedLetters = shuffle(randomItem(TIME_TRIAL_STARTER_RACKS));
+  return step;
+}
+
+function startTimeTrial(trial, seconds = TIME_TRIAL_SECONDS) {
+  const step = buildTimeTrialStep(trial, seconds);
   state.workout = null;
   state.pendingWorkoutStep = null;
-  state.session = createSession("peel", {
+  state.session = createSession(step.id, {
     mode: "main",
-    timeLimitSeconds: seconds,
+    timeLimitSeconds: step.seconds,
+    fixedLetters: step.fixedLetters || null,
+    practiceTitle: step.practiceTitle,
+    timeTrialMode: step.timeTrialMode,
+    timeTrialLabel: step.timeTrialLabel,
+    timeTrialPrompt: step.timeTrialPrompt,
     timerId: null,
-    tilesDrawn: 12
+    tilesDrawn: step.id === "peel" ? (step.fixedLetters?.length || 12) : 0
   });
   state.session.timerId = window.setInterval(tickMainPractice, 250);
-  resetTiles(12);
-  loadDrill("peel");
+  resetTiles(step.id === "peel" ? (step.fixedLetters?.length || 12) : 12, step.fixedLetters ? [...step.fixedLetters] : null);
+  loadDrill(step.id);
   showView("session");
   tickMainPractice();
+}
+
+function startMainPractice(seconds, mode = "letters") {
+  const trial = TIME_TRIAL_MODES.find((item) => item.mode === mode) || TIME_TRIAL_MODES[1];
+  startTimeTrial(trial, seconds);
 }
 
 function startDailyWorkout() {
@@ -603,10 +655,9 @@ function startDailyWorkout() {
 }
 
 function buildDailyWorkoutSteps() {
-  const finisher = { ...randomItem(DAILY_WORKOUT_FINISHERS) };
+  const finisher = buildTimeTrialStep(randomItem(DAILY_WORKOUT_FINISHERS));
   const tileRush = { ...randomItem(DAILY_TILE_RUSH_POOL) };
   const troubleTile = { ...randomItem(DAILY_TROUBLE_POOL) };
-  if (finisher.id === "peel") finisher.fixedLetters = shuffle(randomItem(TIME_TRIAL_STARTER_RACKS));
   return [
     ...shuffle([tileRush, troubleTile]),
     finisher
@@ -630,8 +681,12 @@ function startWorkoutStep(index) {
     timeLimitSeconds: step.seconds || null,
     wordMode: step.wordMode || null,
     troubleProfile: step.troubleProfile || null,
+    troubleLetter: step.troubleLetter || null,
     fixedLetters: step.fixedLetters || null,
     practiceTitle: step.practiceTitle || null,
+    timeTrialMode: step.timeTrialMode || null,
+    timeTrialLabel: step.timeTrialLabel || null,
+    timeTrialPrompt: step.timeTrialPrompt || null,
     timerId: null,
     tilesDrawn: step.id === "peel" ? (step.fixedLetters?.length || 12) : 0
   });
@@ -649,6 +704,7 @@ function startDrill(id, options = {}) {
     mode: "drill",
     wordMode: options.wordMode || null,
     troubleProfile: options.troubleProfile || null,
+    troubleLetter: options.troubleLetter || null,
     practiceTitle: options.label || options.practiceTitle || null
   });
   resetTiles(12);
@@ -751,6 +807,10 @@ function completeRound() {
   const boardScore = getBoardScore();
   state.session.lettersPlaced = boardScore.validTiles;
   state.session.invalidTiles = boardScore.invalidTiles;
+  if (["main", "daily"].includes(state.session.mode) && state.session.timeTrialMode) {
+    state.session.timeTrialResult = calculateTimeTrialResult(state.session);
+    state.session.words = state.session.timeTrialResult.words || state.session.words;
+  }
   state.stats.sessions = (state.stats.sessions || 0) + 1;
   state.stats.words = (state.stats.words || 0) + state.session.words;
   state.stats.dumps = (state.stats.dumps || 0) + state.session.dumps;
@@ -808,15 +868,15 @@ function makeWorkoutResult(session) {
   if (session.drillId === "flex") {
     return {
       title,
-      score: session.flexScore?.score || 0,
-      detail: `${getFlexMetric(session.flexScore, "hooks")} hooks, ${getFlexMetric(session.flexScore, "crosses")} crosses`
+      score: getSessionScore(session),
+      detail: getTimeTrialDetail(session) || `${getFlexMetric(session.flexScore, "hooks")} hooks, ${getFlexMetric(session.flexScore, "crosses")} crosses`
     };
   }
   if (session.drillId === "peel") {
     return {
       title,
-      score: session.lettersPlaced || 0,
-      detail: `${session.invalidTiles || 0} invalid, ${session.peels || 0} Take 1`
+      score: getSessionScore(session),
+      detail: getTimeTrialDetail(session) || `${session.invalidTiles || 0} invalid, ${session.peels || 0} Take 1`
     };
   }
   return {
@@ -840,8 +900,12 @@ function getRoundConfig(session) {
     drillId: session.drillId,
     timeLimitSeconds: session.timeLimitSeconds || null,
     troubleProfile: session.troubleProfile || null,
+    troubleLetter: session.troubleLetter || null,
     wordMode: session.wordMode || null,
     practiceTitle: session.practiceTitle || null,
+    timeTrialMode: session.timeTrialMode || null,
+    timeTrialLabel: session.timeTrialLabel || null,
+    timeTrialPrompt: session.timeTrialPrompt || null,
     fixedLetters: session.fixedLetters ? [...session.fixedLetters] : null
   };
 }
@@ -860,7 +924,7 @@ function playAgain() {
     renderHome();
     return;
   }
-  if (round.mode === "main") startMainPractice(round.timeLimitSeconds || MAIN_PRACTICE_PRESETS[1].seconds);
+  if (round.mode === "main") startMainPractice(round.timeLimitSeconds || TIME_TRIAL_SECONDS, round.timeTrialMode || "letters");
   else if (round.mode === "daily") startDailyWorkout();
   else startDrill(round.drillId, round);
 }
@@ -879,17 +943,9 @@ function renderSummary() {
     : 0;
   els.summaryTitle.textContent = isFinalDailySummary ? "Workout Complete" : "Round Complete";
   const metrics = current?.drillId === "peel"
-    ? [
-        ["Score", current.lettersPlaced || 0],
-        ["Invalid", current.invalidTiles || 0],
-        ["Take 1", current.peels || 0],
-        ["Trades", current.dumps || 0]
-      ]
+    ? getPeelSummaryMetrics(current)
     : current?.drillId === "flex"
-      ? [
-          ["Hooks", getFlexMetric(current.flexScore, "hooks")],
-          ["Crosses", getFlexMetric(current.flexScore, "crosses")]
-        ]
+      ? getFlexSummaryMetrics(current)
     : current?.drillId === "glue"
       ? [
           ["Connected", current.glueSolved ? "Yes" : "No"],
@@ -961,6 +1017,91 @@ function summaryLine() {
 
 function getFlexMetric(flexScore, label) {
   return flexScore?.metrics.find(([metricLabel]) => metricLabel === label)?.[1] || 0;
+}
+
+function getPeelSummaryMetrics(session) {
+  if (!session.timeTrialResult) {
+    return [
+      ["Score", session.lettersPlaced || 0],
+      ["Invalid", session.invalidTiles || 0],
+      ["Take 1", session.peels || 0],
+      ["Trades", session.dumps || 0]
+    ];
+  }
+  return [
+    [session.timeTrialResult.label || "Score", session.timeTrialResult.score || 0],
+    ["Words", session.timeTrialResult.words || 0],
+    ["Letters", session.timeTrialResult.letters || 0],
+    ["Invalid", session.timeTrialResult.invalid || 0]
+  ];
+}
+
+function getFlexSummaryMetrics(session) {
+  if (session.timeTrialResult?.mode === "flex") {
+    return [
+      ["Board Score", session.timeTrialResult.score || 0],
+      ["Hooks", session.timeTrialResult.hooks || 0],
+      ["Crosses", session.timeTrialResult.crosses || 0]
+    ];
+  }
+  return [
+    ["Hooks", getFlexMetric(session.flexScore, "hooks")],
+    ["Crosses", getFlexMetric(session.flexScore, "crosses")]
+  ];
+}
+
+function getSessionScore(session) {
+  if (session.timeTrialResult) return session.timeTrialResult.score;
+  if (session.drillId === "flex") return session.flexScore?.score || 0;
+  if (session.drillId === "peel") return session.lettersPlaced || 0;
+  return session.words || 0;
+}
+
+function getTimeTrialDetail(session) {
+  if (!session.timeTrialResult) return "";
+  const result = session.timeTrialResult;
+  if (result.mode === "flex") {
+    return `${result.hooks} hooks, ${result.crosses} crosses`;
+  }
+  return `${result.words} words, ${result.letters} letters, ${result.invalid} invalid`;
+}
+
+function calculateTimeTrialResult(session) {
+  const mode = session.timeTrialMode || "letters";
+  const words = getValidBoardWords();
+  const letters = session.lettersPlaced || 0;
+  const invalid = session.invalidTiles || 0;
+  const scrabble = words.reduce((total, word) => total + getWordScore(word.text), 0);
+
+  if (mode === "words") {
+    return { mode, label: "Words", score: words.length, words: words.length, letters, invalid, scrabble };
+  }
+  if (mode === "scrabble") {
+    return { mode, label: "Score", score: scrabble, words: words.length, letters, invalid, scrabble };
+  }
+  if (mode === "flex") {
+    const flexScore = session.flexScore || calculateFlexScore();
+    return {
+      mode,
+      label: "Board Score",
+      score: flexScore.score || 0,
+      words: words.length,
+      letters,
+      invalid,
+      scrabble,
+      hooks: getFlexMetric(flexScore, "hooks"),
+      crosses: getFlexMetric(flexScore, "crosses")
+    };
+  }
+  return { mode: "letters", label: "Letters", score: letters, words: words.length, letters, invalid, scrabble };
+}
+
+function getValidBoardWords() {
+  return getBoardWords().filter((word) => WORD_SET.has(word.text));
+}
+
+function getWordScore(word) {
+  return [...word].reduce((total, letter) => total + (SCRABBLE_TILE_VALUES[letter] || 0), 0);
 }
 
 function formatPercent(found, possible) {
@@ -1259,7 +1400,7 @@ function nextTemplateGluePuzzle() {
 }
 
 function renderTrouble() {
-  const setup = makeTroubleWordSetup(state.session.troubleProfile);
+  const setup = makeTroubleWordSetup(state.session.troubleProfile, state.session.troubleLetter);
   const trouble = setup.trouble;
   const letters = setup.letters;
   state.session.troubleLetter = trouble;
@@ -1298,9 +1439,9 @@ function renderTrouble() {
   renderTroubleAttempts();
 }
 
-function makeTroubleWordSetup(profileLabel = null) {
+function makeTroubleWordSetup(profileLabel = null, selectedTrouble = null) {
   const profile = TROUBLE_RACK_PROFILES.find((item) => item.label === profileLabel) || randomItem(TROUBLE_RACK_PROFILES);
-  const trouble = randomItem(TROUBLE_LETTERS);
+  const trouble = TROUBLE_LETTERS.includes(selectedTrouble) ? selectedTrouble : randomItem(TROUBLE_LETTERS);
   const mode = {
     ...TROUBLE_WORD_MODE,
     ...profile,
@@ -1335,7 +1476,7 @@ function finishTroubleTile() {
 }
 
 function renderFlex() {
-  els.drillPrompt.textContent = "Build a board with open hooks for future plays and crosses where words share tiles.";
+  els.drillPrompt.textContent = state.session.timeTrialPrompt || "Build a board with open hooks for future plays and crosses where words share tiles.";
   els.drillSurface.innerHTML = `
     <div class="flex-score" id="flexScore">
       <div class="board-score">
@@ -1388,9 +1529,9 @@ function splitLetterRows(letters) {
 }
 
 function renderPeel() {
-  els.drillPrompt.textContent = state.session.mode === "main" || state.session.timeLimitSeconds
+  els.drillPrompt.textContent = state.session.timeTrialPrompt || (state.session.mode === "main" || state.session.timeLimitSeconds
     ? "Place as many letters as you can before time runs out. Take 1 when your tray is empty."
-    : "Use every tray tile in valid words. Take 1 when your tray is empty.";
+    : "Use every tray tile in valid words. Take 1 when your tray is empty.");
   const fixedLetters = state.session.fixedLetters ? [...state.session.fixedLetters] : null;
   resetTiles(fixedLetters?.length || 12, fixedLetters);
   els.sessionActions.innerHTML = `<button id="finishPeel" class="primary">Done</button>`;
@@ -1632,6 +1773,7 @@ function bindWordInput(letters, options = {}) {
   input.addEventListener("keydown", (event) => {
     if (event.key === "Enter") trySubmit();
   });
+  bindLetterRowToInput(input);
   input.focus();
 }
 
@@ -1676,7 +1818,36 @@ function bindTroubleInput(letters, trouble) {
   input.addEventListener("keydown", (event) => {
     if (event.key === "Enter") trySubmit();
   });
+  bindLetterRowToInput(input);
   input.focus();
+}
+
+function bindLetterRowToInput(input) {
+  document.querySelectorAll(".letter-row .letter-chip").forEach((tile) => {
+    tile.setAttribute("role", "button");
+    tile.setAttribute("tabindex", "0");
+    tile.setAttribute("aria-label", `Add ${tile.textContent.trim()}`);
+    const addLetter = () => appendTileLetterToInput(input, tile.textContent);
+    tile.addEventListener("click", addLetter);
+    tile.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        addLetter();
+      }
+    });
+  });
+}
+
+function appendTileLetterToInput(input, value) {
+  const letter = (value || "").trim().toUpperCase();
+  if (!letter) return;
+  const start = input.selectionStart ?? input.value.length;
+  const end = input.selectionEnd ?? input.value.length;
+  const next = `${input.value.slice(0, start)}${letter}${input.value.slice(end)}`;
+  input.value = next.toUpperCase();
+  input.focus();
+  const cursor = start + letter.length;
+  input.setSelectionRange(cursor, cursor);
 }
 
 function trackWordAttempt(word, valid, shouldTrack) {
