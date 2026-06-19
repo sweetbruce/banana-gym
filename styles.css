@@ -737,6 +737,7 @@ h3 {
 
 .board-wrap {
   margin-top: 0;
+  overflow: hidden;
 }
 
 .board-toolbar {
@@ -777,6 +778,16 @@ h3 {
   border-radius: 8px;
   background: rgba(88, 62, 7, 0.18);
   touch-action: none;
+}
+
+.board-wrap.zoom-close .board {
+  width: min(114%, 640px);
+  max-width: none;
+}
+
+.board-wrap.zoom-mid .board {
+  width: min(106%, 600px);
+  max-width: none;
 }
 
 .cell {

@@ -1,7 +1,7 @@
 const DRILLS = {
-  flash: { name: "Tile Rush", short: "Find fast words from loose tiles." },
+  flash: { name: "Tile Rush", short: "Find 2- and 3-letter words from loose tiles." },
   glue: { name: "Glue Words", short: "Place short connector words." },
-  trouble: { name: "Trouble Tile", short: "Find rescue words for awkward letters." },
+  trouble: { name: "Trouble Tile", short: "Find words in this rack that use an awkward tile." },
   flex: { name: "Hooks & Crosses", short: "Build boards with growth points and crossings." },
   peel: { name: "Main Practice", short: "Use every tile, then take one more." },
   learn: { name: "Learn to Play", short: "A guided tour of the basic rules." },
@@ -14,7 +14,6 @@ const DEFAULT_SETTINGS = {
   adaptive: true,
   enabledDrills: {
     flash: true,
-    glue: true,
     trouble: true,
     flex: true
   }
@@ -26,19 +25,55 @@ const MAIN_PRACTICE_PRESETS = [
   { label: "10 min", seconds: 600, short: "A longer table-rhythm challenge." }
 ];
 
-const DAILY_WORKOUT_OPENING_STEPS = [
-  { id: "flash", seconds: 30, short: "Warm up word recognition." },
-  { id: "trouble", seconds: 30, short: "Practice rescue letters.", troubleProfile: "Messy Hand" }
-];
-
-const DAILY_WORKOUT_BOARD_STEPS = [
-  { id: "glue", seconds: 30, short: "Connect word islands." },
-  { id: "flex", seconds: 30, short: "Build hooks and crosses." }
+const DAILY_WORKOUT_DRILL_POOL = [
+  { id: "flash", seconds: 45, short: "Find 2-letter words.", wordMode: "twos", dailyKey: "flash-twos" },
+  { id: "flash", seconds: 45, short: "Find 3-letter words.", wordMode: "threes", dailyKey: "flash-threes" },
+  { id: "trouble", seconds: 45, short: "Practice trouble tiles.", troubleProfile: "Messy Hand", dailyKey: "trouble" },
+  { id: "flex", seconds: 45, short: "Build hooks and crosses.", dailyKey: "flex" }
 ];
 
 const DAILY_WORKOUT_TIME_TRIAL = { id: "peel", seconds: 90, short: "Finish with a time trial." };
 
-const DRILL_ORDER = ["flash", "trouble", "glue", "flex"];
+const DRILL_ORDER = ["flash", "trouble", "flex"];
+
+const TIME_TRIAL_STARTER_RACKS = [
+  ["T", "R", "A", "I", "N", "S", "E", "L", "D", "O", "P", "M"],
+  ["S", "T", "A", "R", "E", "L", "I", "N", "D", "O", "G", "P"],
+  ["C", "A", "R", "T", "S", "E", "N", "I", "O", "L", "D", "H"],
+  ["P", "L", "A", "N", "E", "T", "S", "R", "I", "O", "M", "C"]
+];
+
+const WORD_FINDING_MODES = {
+  twos: {
+    id: "twos",
+    label: "2-letter words",
+    targetLength: 2,
+    rackSize: 7,
+    seedCount: 5,
+    minPossible: 5,
+    maxPossible: 18,
+    prompt: "Find valid 2-letter words you can make from these tiles."
+  },
+  threes: {
+    id: "threes",
+    label: "3-letter words",
+    targetLength: 3,
+    rackSize: 8,
+    seedCount: 5,
+    minPossible: 6,
+    maxPossible: 24,
+    prompt: "Find valid 3-letter words you can make from these tiles."
+  }
+};
+
+const TROUBLE_WORD_MODE = {
+  id: "trouble",
+  label: "trouble-tile words",
+  rackSize: 9,
+  seedCount: 5,
+  minPossible: 5,
+  maxPossible: 24
+};
 
 const LEARN_STEPS = [
   {
@@ -99,20 +134,13 @@ const LEARN_STEPS = [
   }
 ];
 
-const TROUBLE_RESCUES = {
-  J: ["JO", "JOT", "JAM", "JAR", "JAW", "JET", "JIG", "JOG", "JOY", "JUG", "JUNE"],
-  Q: ["QI", "QIS", "QAT", "AQUA", "QUIT", "QUIZ"],
-  X: ["AX", "EX", "OX", "XI", "AXE", "BOX", "FOX", "FIX", "VEX", "TUX"],
-  Z: ["ZA", "ZAG", "ZAP", "ZAX", "ZED", "ZEN", "ZIG", "ZIP", "ZIT", "ZONE"],
-  K: ["KA", "KI", "ARK", "KIN", "KIT", "KEN", "KEY", "SKI", "YAK"],
-  V: ["VAN", "VAT", "VEX", "VIA", "VIE", "REV", "OVA"]
-};
+const TROUBLE_LETTERS = ["J", "Q", "X", "Z", "K", "V"];
 
 const TROUBLE_RACK_PROFILES = [
-  { label: "Obvious", maxLength: 4, targetCount: 1, distractors: 0 },
-  { label: "Easy", maxLength: 6, targetCount: 2, distractors: 1 },
-  { label: "Rescue Reps", maxLength: 9, targetCount: 4, distractors: 2 },
-  { label: "Messy Hand", maxLength: 12, targetCount: 5, distractors: 3 }
+  { label: "Obvious", rackSize: 5, seedCount: 2, minPossible: 1, maxPossible: 10 },
+  { label: "Easy", rackSize: 7, seedCount: 3, minPossible: 3, maxPossible: 16 },
+  { label: "Rescue Reps", rackSize: 8, seedCount: 4, minPossible: 4, maxPossible: 22 },
+  { label: "Messy Hand", rackSize: 10, seedCount: 5, minPossible: 5, maxPossible: 30 }
 ];
 
 const GLUE_PUZZLES = [
@@ -296,6 +324,7 @@ const els = {
   drillTitle: document.querySelector("#drillTitle"),
   drillPrompt: document.querySelector("#drillPrompt"),
   drillSurface: document.querySelector("#drillSurface"),
+  boardWrap: document.querySelector("#boardWrap"),
   board: document.querySelector("#board"),
   boardHint: document.querySelector("#boardHint"),
   tray: document.querySelector("#tray"),
@@ -481,10 +510,13 @@ function startDailyWorkout() {
 }
 
 function buildDailyWorkoutSteps() {
+  const timeTrial = {
+    ...DAILY_WORKOUT_TIME_TRIAL,
+    fixedLetters: shuffle(randomItem(TIME_TRIAL_STARTER_RACKS))
+  };
   return [
-    ...DAILY_WORKOUT_OPENING_STEPS,
-    randomItem(DAILY_WORKOUT_BOARD_STEPS),
-    DAILY_WORKOUT_TIME_TRIAL
+    ...shuffle(DAILY_WORKOUT_DRILL_POOL).slice(0, 2),
+    timeTrial
   ];
 }
 
@@ -503,12 +535,14 @@ function startWorkoutStep(index) {
     workoutIndex: index,
     workoutTotal: state.workout.steps.length,
     timeLimitSeconds: step.seconds || null,
+    wordMode: step.wordMode || null,
     troubleProfile: step.troubleProfile || null,
+    fixedLetters: step.fixedLetters || null,
     timerId: null,
-    tilesDrawn: step.id === "peel" ? 12 : 0
+    tilesDrawn: step.id === "peel" ? (step.fixedLetters?.length || 12) : 0
   });
   if (state.session.timeLimitSeconds) state.session.timerId = window.setInterval(tickMainPractice, 250);
-  resetTiles(step.id === "peel" ? 12 : 12);
+  resetTiles(step.id === "peel" ? (step.fixedLetters?.length || 12) : 12, step.fixedLetters ? [...step.fixedLetters] : null);
   loadDrill(step.id);
   showView("session");
   if (state.session.timeLimitSeconds) tickMainPractice();
@@ -571,7 +605,8 @@ function loadDrill(id) {
   els.sessionActions.innerHTML = "";
   els.sessionExplainer.textContent = "";
   clearLearnHighlights();
-  document.querySelector("#boardWrap").classList.toggle("hidden", !["glue", "flex", "peel", "rebuild", "learn"].includes(id));
+  els.boardWrap.classList.toggle("hidden", !["glue", "flex", "peel", "rebuild", "learn"].includes(id));
+  els.boardWrap.classList.remove("zoom-close", "zoom-mid");
   window.scrollTo({ top: 0, behavior: "smooth" });
 
   if (id === "flash") renderFlash();
@@ -659,7 +694,7 @@ function makeWorkoutResult(session) {
     return {
       title,
       score: formatPercent(session.troubleFoundCount || 0, session.troublePossibleCount || 0),
-      detail: `${session.troubleFoundCount || 0}/${session.troublePossibleCount || 0} rescue words for ${session.troubleLetter || "-"}`
+      detail: `${session.troubleFoundCount || 0}/${session.troublePossibleCount || 0} words using ${session.troubleLetter || "-"}`
     };
   }
   if (session.drillId === "glue") {
@@ -703,7 +738,9 @@ function getRoundConfig(session) {
     mode: session.mode,
     drillId: session.drillId,
     timeLimitSeconds: session.timeLimitSeconds || null,
-    troubleProfile: session.troubleProfile || null
+    troubleProfile: session.troubleProfile || null,
+    wordMode: session.wordMode || null,
+    fixedLetters: session.fixedLetters ? [...session.fixedLetters] : null
   };
 }
 
@@ -808,8 +845,8 @@ function summaryLine() {
   if (state.session.drillId === "flex") return "Board score rewards hooks that keep the grid open and crosses that make tiles work twice.";
   if (state.session.drillId === "glue") return state.session.glueSolved ? "All word islands are connected." : "Glue Words ends when every word island becomes one connected valid board.";
   if (state.session.drillId === "flash") return "Review the possible words, then the words you found.";
-  if (state.session.drillId === "trouble") return `Review ${state.session.troubleLetter || "the"} rescue words, then the words you found.`;
-  if (state.session.dumps > state.session.peels) return "A lot of tiles got traded in today. Next session will keep an eye on rescue words.";
+  if (state.session.drillId === "trouble") return `Review the possible words using ${state.session.troubleLetter || "the trouble tile"}, then the words you found.`;
+  if (state.session.dumps > state.session.peels) return "A lot of tiles got traded in today. Next session will keep an eye on trouble tiles.";
   if (state.session.peels > 1) return "Nice Take 1 tempo. The grid work is starting to behave.";
   return "Solid reps. Short daily practice is how the word reflex gets built.";
 }
@@ -823,14 +860,99 @@ function formatPercent(found, possible) {
   return `${Math.round((found / possible) * 100)}%`;
 }
 
+function makeWordFindingSetup(mode) {
+  const candidates = getWordFindingCandidates(mode);
+  const targetCount = mode.seedCount || 4;
+  let best = null;
+
+  for (let attempt = 0; attempt < 250; attempt++) {
+    let letters = mode.trouble ? [mode.trouble] : [];
+    let seedsAdded = 0;
+
+    for (const word of shuffle(candidates)) {
+      const next = mergeWordIntoRack(letters, word, mode.rackSize);
+      if (!next) continue;
+      letters = next;
+      seedsAdded += 1;
+      if (seedsAdded >= targetCount) break;
+    }
+
+    letters = fillWordFindingRack(letters, mode.rackSize);
+    letters = mode.trouble ? focusTroubleRack(letters, mode.trouble) : shuffle(letters);
+    const possible = getPossibleWordsForMode(letters, mode);
+    const score = scoreWordFindingRack(possible.length, mode);
+    const setup = { letters, possible, mode, score };
+
+    if (!best || setup.score < best.score) best = setup;
+    if (score === 0) return setup;
+  }
+
+  if (best) return best;
+
+  const letters = mode.trouble
+    ? focusTroubleRack(fillWordFindingRack([mode.trouble], mode.rackSize), mode.trouble)
+    : drawLetters(mode.rackSize || 7);
+  return { letters, possible: getPossibleWordsForMode(letters, mode), mode, score: 0 };
+}
+
+function getWordFindingCandidates(mode) {
+  const maxLength = Math.min(mode.rackSize || 8, mode.trouble ? 5 : mode.targetLength || 5);
+  return [...WORD_SET]
+    .filter((word) => /^[A-Z]+$/.test(word))
+    .filter((word) => word.length >= 2 && word.length <= maxLength)
+    .filter((word) => wordMatchesMode(word, mode));
+}
+
+function wordMatchesMode(word, mode) {
+  if (mode.targetLength && word.length !== mode.targetLength) return false;
+  if (mode.trouble && !word.includes(mode.trouble)) return false;
+  return true;
+}
+
+function fillWordFindingRack(letters, rackSize) {
+  const rack = [...letters];
+  const bag = makeBag();
+  while (rack.length < rackSize && bag.length) {
+    const index = Math.floor(Math.random() * bag.length);
+    rack.push(bag.splice(index, 1)[0]);
+  }
+  return rack;
+}
+
+function focusTroubleRack(letters, trouble) {
+  const rack = [...letters];
+  const index = rack.indexOf(trouble);
+  if (index >= 0) rack.splice(index, 1);
+  return [trouble, ...shuffle(rack)];
+}
+
+function scoreWordFindingRack(possibleCount, mode) {
+  const min = mode.minPossible || 1;
+  const max = mode.maxPossible || 30;
+  if (possibleCount >= min && possibleCount <= max) return 0;
+  return possibleCount < min ? min - possibleCount : possibleCount - max;
+}
+
+function getPossibleWordsForMode(letters, mode) {
+  return getPossibleWords(letters).filter((word) => wordMatchesMode(word, mode));
+}
+
 function renderFlash() {
-  const letters = drawLetters(7);
+  const mode = WORD_FINDING_MODES[state.session.wordMode] || randomItem(Object.values(WORD_FINDING_MODES));
+  const setup = makeWordFindingSetup(mode);
+  const letters = setup.letters;
   state.session.flashAttempts = [];
+  state.session.flashMode = mode.id;
+  state.session.flashLabel = mode.label;
   state.session.flashLetters = letters;
-  state.session.flashAnswers = getPossibleWords(letters);
-  els.drillPrompt.textContent = "Make as many valid words as you can from these tiles.";
+  state.session.flashAnswers = setup.possible;
+  els.drillPrompt.textContent = mode.prompt;
   els.drillSurface.innerHTML = `
     <div class="flash-panel">
+      <div class="trouble-focus">
+        <span>Target</span>
+        <strong>${escapeHtml(mode.label)}</strong>
+      </div>
       <div class="attempt-log">
         <div class="attempt-list">
           <strong>&#127820; Valid</strong>
@@ -850,7 +972,11 @@ function renderFlash() {
     </div>
   `;
   els.sessionActions.innerHTML = `<button id="finishFlash" class="primary">Done</button>`;
-  bindWordInput(letters, { trackAttempts: true });
+  bindWordInput(letters, {
+    trackAttempts: true,
+    isTargetWord: (word) => word.length === mode.targetLength,
+    offTargetMessage: (word) => `${word} is valid, but this round is only ${mode.label}.`
+  });
   document.querySelector("#finishFlash").addEventListener("click", finishTileFlash);
   renderFlashAttempts();
 }
@@ -1029,20 +1155,21 @@ function nextTemplateGluePuzzle() {
 }
 
 function renderTrouble() {
-  const trouble = randomItem(Object.keys(TROUBLE_RESCUES));
-  const setup = makeTroubleFlashSetup(trouble, state.session.troubleProfile);
+  const setup = makeTroubleWordSetup(state.session.troubleProfile);
+  const trouble = setup.trouble;
   const letters = setup.letters;
   state.session.troubleLetter = trouble;
   state.session.troubleLevel = setup.profile.label;
+  state.session.troubleLabel = `${trouble} words`;
   state.session.troubleLetters = letters;
   state.session.troublePossible = setup.possible;
   state.session.troubleAttempts = [];
   state.session.troubleScored = false;
-  els.drillPrompt.textContent = `${setup.profile.label}: find valid rescue words that use ${trouble}.`;
+  els.drillPrompt.textContent = `${setup.profile.label}: find valid words from these tiles that use ${trouble}.`;
   els.drillSurface.innerHTML = `
     <div class="flash-panel">
       <div class="trouble-focus">
-        <span>Trouble letter</span>
+        <span>Use this tile</span>
         <strong class="letter-chip focus">${trouble}</strong>
       </div>
       <div class="attempt-log">
@@ -1057,7 +1184,7 @@ function renderTrouble() {
       </div>
       <div class="letter-row">${letters.map((letter, index) => `<span class="letter-chip ${index === 0 ? "focus" : ""}">${letter}</span>`).join("")}</div>
       <div class="word-entry">
-        <input id="wordInput" maxlength="32" placeholder="Type a rescue word">
+        <input id="wordInput" maxlength="32" placeholder="Type a word">
         <button id="submitWord">Submit</button>
       </div>
       <p id="wordFeedback"></p>
@@ -1071,40 +1198,17 @@ function renderTrouble() {
   renderTroubleAttempts();
 }
 
-function makeTroubleFlashSetup(trouble, profileLabel = null) {
+function makeTroubleWordSetup(profileLabel = null) {
   const profile = TROUBLE_RACK_PROFILES.find((item) => item.label === profileLabel) || randomItem(TROUBLE_RACK_PROFILES);
-  const seeds = shuffle(TROUBLE_RESCUES[trouble].filter((word) => WORD_SET.has(word)));
-  let letters = [trouble];
-  const targetWords = seeds.slice(0, profile.targetCount);
-  targetWords.forEach((word) => {
-    const next = mergeWordIntoRack(letters, word, profile.maxLength);
-    if (next) letters = next;
-  });
-
-  let distractorsAdded = 0;
-  while (distractorsAdded < profile.distractors && letters.length < profile.maxLength) {
-    const letter = drawTroubleDistractor(letters, trouble);
-    letters.push(letter);
-    distractorsAdded += 1;
-  }
-
-  letters = [trouble, ...shuffle(letters.slice(1))];
-  let possible = getPossibleRescueWords(letters, trouble);
-
-  if (!possible.length) {
-    const fallback = seeds[0] || trouble;
-    letters = [trouble, ...shuffle([...fallback].filter((letter, index) => letter !== trouble || index !== fallback.indexOf(trouble)))];
-    possible = getPossibleRescueWords(letters, trouble);
-  }
-
-  return { letters, possible, profile };
-}
-
-function drawTroubleDistractor(currentLetters, trouble) {
-  const bag = makeBag().filter((letter) => letter !== trouble);
-  const counts = countLetters(currentLetters);
-  const filtered = bag.filter((letter) => (counts.get(letter) || 0) < 2);
-  return randomItem(filtered.length ? filtered : bag);
+  const trouble = randomItem(TROUBLE_LETTERS);
+  const mode = {
+    ...TROUBLE_WORD_MODE,
+    ...profile,
+    label: `${trouble} words`,
+    trouble
+  };
+  const setup = makeWordFindingSetup(mode);
+  return { ...setup, trouble, profile };
 }
 
 function mergeWordIntoRack(rack, word, maxLength) {
@@ -1122,12 +1226,6 @@ function countLetters(letters) {
     counts.set(letter, (counts.get(letter) || 0) + 1);
     return counts;
   }, new Map());
-}
-
-function getPossibleRescueWords(letters, trouble) {
-  return getPossibleWords(letters)
-    .filter((word) => word.includes(trouble))
-    .sort((a, b) => a.length - b.length || a.localeCompare(b));
 }
 
 function finishTroubleTile() {
@@ -1159,7 +1257,8 @@ function renderPeel() {
   els.drillPrompt.textContent = state.session.mode === "main" || state.session.timeLimitSeconds
     ? "Place as many letters as you can before time runs out. Take 1 when your tray is empty."
     : "Use every tray tile in valid words. Take 1 when your tray is empty.";
-  resetTiles(12);
+  const fixedLetters = state.session.fixedLetters ? [...state.session.fixedLetters] : null;
+  resetTiles(fixedLetters?.length || 12, fixedLetters);
   els.sessionActions.innerHTML = `<button id="finishPeel" class="primary">Done</button>`;
   document.querySelector("#finishPeel").addEventListener("click", completeRound);
 }
@@ -1188,7 +1287,7 @@ function renderLearn() {
   els.drillPrompt.textContent = step.copy;
   els.sessionExplainer.textContent = step.copy;
   setSessionMeta(`${state.session.learnStep + 1}/${LEARN_STEPS.length}`, {});
-  document.querySelector("#boardWrap").classList.toggle("hidden", step.board === false);
+  els.boardWrap.classList.toggle("hidden", step.board === false);
   updateLearnControlFocus(step);
   updateLearnTargets(step);
 
@@ -1374,6 +1473,15 @@ function bindWordInput(letters, options = {}) {
       return;
     }
     if (WORD_SET.has(word)) {
+      if (options.isTargetWord && !options.isTargetWord(word)) {
+        feedback.textContent = typeof options.offTargetMessage === "function"
+          ? options.offTargetMessage(word)
+          : `${word} is valid, but it does not match this round's target.`;
+        state.session.misses += 1;
+        trackWordAttempt(word, false, options.trackAttempts);
+        input.value = "";
+        return;
+      }
       feedback.textContent = `${word} counts. Nice quick recognition.`;
       input.value = "";
       state.session.words += 1;
@@ -1476,12 +1584,14 @@ function finishTileFlash() {
 function scoreTileFlash() {
   const attempts = state.session.flashAttempts || [];
   const found = [...new Set(attempts.filter((attempt) => attempt.valid).map((attempt) => attempt.word))];
-  const answers = state.session.flashAnswers || getPossibleWords(state.session.flashLetters || []);
+  const mode = WORD_FINDING_MODES[state.session.flashMode] || WORD_FINDING_MODES.twos;
+  const answers = state.session.flashAnswers || getPossibleWordsForMode(state.session.flashLetters || [], mode);
   state.session.flashFound = found;
   state.session.flashMissed = answers.filter((word) => !found.includes(word));
   state.session.flashFoundCount = found.length;
   state.session.flashPossibleCount = answers.length;
   state.session.flashInvalidCount = attempts.filter((attempt) => !attempt.valid).length;
+  state.session.words = found.length;
 }
 
 function getPossibleWords(letters) {
@@ -1493,7 +1603,10 @@ function getPossibleWords(letters) {
 function scoreTroubleTile() {
   const attempts = state.session.troubleAttempts || [];
   const found = uniqueWords(attempts.filter((attempt) => attempt.valid).map((attempt) => attempt.word));
-  const possible = state.session.troublePossible || getPossibleRescueWords(state.session.troubleLetters || [], state.session.troubleLetter || "");
+  const possible = state.session.troublePossible || getPossibleWordsForMode(state.session.troubleLetters || [], {
+    ...TROUBLE_WORD_MODE,
+    trouble: state.session.troubleLetter || ""
+  });
   state.session.troubleFound = found;
   state.session.troubleRescues = found;
   state.session.troubleMissed = possible.filter((word) => !found.includes(word));
@@ -1523,11 +1636,12 @@ function renderFlexSummaryDetails(session) {
 }
 
 function renderFlashSummaryDetails(session) {
-  const possible = session.flashAnswers || getPossibleWords(session.flashLetters || []);
+  const mode = WORD_FINDING_MODES[session.flashMode] || WORD_FINDING_MODES.twos;
+  const possible = session.flashAnswers || getPossibleWordsForMode(session.flashLetters || [], mode);
   const found = session.flashFound || [];
   els.summaryDetails.innerHTML = `
     <div class="summary-list">
-      <strong>Possible Words</strong>
+      <strong>Possible ${escapeHtml(session.flashLabel || mode.label)}</strong>
       <div>${renderWordPills(possible)}</div>
     </div>
     <div class="summary-list">
@@ -1538,7 +1652,10 @@ function renderFlashSummaryDetails(session) {
 }
 
 function renderTroubleSummaryDetails(session) {
-  const possible = session.troublePossible || getPossibleRescueWords(session.troubleLetters || [], session.troubleLetter || "");
+  const possible = session.troublePossible || getPossibleWordsForMode(session.troubleLetters || [], {
+    ...TROUBLE_WORD_MODE,
+    trouble: session.troubleLetter || ""
+  });
   const found = session.troubleFound || [];
   els.summaryDetails.innerHTML = `
     <div class="summary-list">
@@ -1546,7 +1663,7 @@ function renderTroubleSummaryDetails(session) {
       <div><span class="letter-chip focus">${escapeHtml(session.troubleLetter || "-")}</span></div>
     </div>
     <div class="summary-list">
-      <strong>Possible Rescue Words</strong>
+      <strong>Possible Words From These Tiles</strong>
       <div>${renderWordPills(possible)}</div>
     </div>
     <div class="summary-list">
@@ -1639,6 +1756,15 @@ function renderTiles() {
   updateFlexScore();
   updateGlueStatus();
   updateLearnProgress();
+  updateBoardZoom();
+}
+
+function updateBoardZoom() {
+  if (!els.boardWrap || els.boardWrap.classList.contains("hidden")) return;
+  const zoomable = ["flex", "peel", "learn"].includes(state.session?.drillId);
+  const placed = getPlacedIndices().length;
+  els.boardWrap.classList.toggle("zoom-close", zoomable && placed < 8);
+  els.boardWrap.classList.toggle("zoom-mid", zoomable && placed >= 8 && placed < 18);
 }
 
 function updateFlexScore() {
