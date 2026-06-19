@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="theme-color" content="#ffd43b">
-    <title>Banana Gym</title>
+    <title>Brooke's Bananagram Gym</title>
     <link rel="stylesheet" href="styles.css">
   </head>
   <body>
@@ -17,8 +17,8 @@
         <div class="brand">
           <div class="mascot" aria-hidden="true">&#127820;</div>
           <div class="brand-text">
-            <p class="brand-eyebrow">Brooke's</p>
-            <h1>Banana Gym</h1>
+            <h1>Brooke's Bananagram Gym</h1>
+            <p class="brand-slogan">Very a-PEEL-ing!</p>
           </div>
         </div>
       </header>
@@ -28,20 +28,25 @@
           <div class="home-menu-panel active" id="homeMenu">
             <p class="menu-instruction">Please choose your practice for today.</p>
             <div class="lane-button-grid">
-              <button class="lane-button recommended" id="dailyWorkoutButton" type="button">
-                <strong>5-Min Daily Workout</strong>
+              <button class="lane-button recommended" id="dailyWorkoutButton" type="button" aria-label="5-Min Daily Workout. Two random 90-second word drills, then either 2 minutes of Hooks and Crosses or a 2-minute time trial.">
+                <strong class="tile-title" data-tile-label="5-Min Daily Workout" aria-hidden="true">5-Min Daily Workout</strong>
+                <span class="lane-subtitle">Two random 90-second word drills, then either 2 minutes of Hooks &amp; Crosses or a 2-minute time trial.</span>
               </button>
-              <button class="lane-button" id="practiceDrillsButton" type="button">
-                <strong>Practice Drills</strong>
+              <button class="lane-button" id="practiceDrillsButton" type="button" aria-label="Practice Drills. Work one Bananagrams skill at a time without a countdown.">
+                <strong class="tile-title" data-tile-label="Practice Drills" aria-hidden="true">Practice Drills</strong>
+                <span class="lane-subtitle">Work one Bananagrams skill at a time without a countdown.</span>
               </button>
-              <button class="lane-button" id="timeTrialsButton" type="button">
-                <strong>Time Trials</strong>
+              <button class="lane-button" id="timeTrialsButton" type="button" aria-label="Time Trials. See how many letters you can play in valid words before time runs out.">
+                <strong class="tile-title" data-tile-label="Time Trials" aria-hidden="true">Time Trials</strong>
+                <span class="lane-subtitle">See how many letters you can play in valid words before time runs out.</span>
               </button>
-              <button class="lane-button" id="learnToPlayButton" type="button">
-                <strong>Learn to Play</strong>
+              <button class="lane-button" id="learnToPlayButton" type="button" aria-label="Learn to Play. A guided tour of the basic rules, tile exchanges, and taking one.">
+                <strong class="tile-title" data-tile-label="Learn to Play" aria-hidden="true">Learn to Play</strong>
+                <span class="lane-subtitle">A guided tour of the basic rules, tile exchanges, and taking one.</span>
               </button>
-              <button class="lane-button" id="settingsButton" type="button">
-                <strong>Settings</strong>
+              <button class="lane-button" id="settingsButton" type="button" aria-label="Settings. Choose enabled drills, difficulty, adaptive focus, and dictionary options.">
+                <strong class="tile-title" data-tile-label="Settings" aria-hidden="true">Settings</strong>
+                <span class="lane-subtitle">Choose enabled drills, difficulty, adaptive focus, and dictionary options.</span>
               </button>
             </div>
           </div>

@@ -63,11 +63,13 @@ button,
 select,
 input {
   font: inherit;
+  max-width: 100%;
 }
 
 button {
   border: 1px solid var(--line);
   border-radius: 8px;
+  min-width: 0;
   min-height: 52px;
   padding: 0.65rem 0.9rem;
   color: var(--ink);
@@ -114,24 +116,29 @@ button:disabled {
   align-items: center;
   gap: 1rem;
   justify-content: center;
+  max-width: 100%;
+  min-width: 0;
 }
 
 .brand-text {
   display: block;
-  width: max-content;
+  max-width: min(100%, 760px);
+  min-width: 0;
   text-align: left;
   line-height: 1;
 }
 
-.brand-eyebrow {
+.brand-slogan {
   display: block;
-  margin: 0;
+  margin: 0.22rem 0 0;
   padding: 0;
   color: var(--muted);
-  font-size: clamp(1rem, 3.8vw, 1.5rem);
+  font-size: 1.12rem;
+  font-style: italic;
   font-weight: 850;
-  line-height: 0.72;
+  line-height: 1.05;
   text-align: left;
+  overflow-wrap: anywhere;
 }
 
 h1,
@@ -142,16 +149,19 @@ p {
 }
 
 h1 {
-  font-size: clamp(2.45rem, 10vw, 5rem);
-  line-height: 0.92;
+  font-size: 3.45rem;
+  line-height: 0.95;
 }
 
 .brand-text h1 {
   display: block;
-  margin: 0 0 0 -0.035em;
+  margin: 0;
   padding: 0;
   text-align: left;
   text-indent: 0;
+  max-width: 11ch;
+  overflow-wrap: break-word;
+  text-wrap: balance;
 }
 
 h2 {
@@ -281,16 +291,20 @@ h3 {
 
 .lane-button {
   width: 100%;
-  min-height: clamp(68px, 11dvh, 90px);
-  padding: clamp(0.65rem, 2dvh, 0.95rem);
-  display: grid;
-  place-items: center;
+  min-width: 0;
+  min-height: clamp(104px, 15dvh, 132px);
+  padding: clamp(0.72rem, 2dvh, 1rem);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.42rem;
   text-align: center;
   background: #fffdfa;
 }
 
 .lane-button.recommended {
-  min-height: clamp(88px, 13.5dvh, 118px);
+  min-height: clamp(124px, 17.5dvh, 156px);
   padding: clamp(0.78rem, 2.35dvh, 1.05rem);
   position: relative;
   overflow: hidden;
@@ -321,6 +335,64 @@ h3 {
   font-size: clamp(1.72rem, 6.7vw, 2.42rem);
   font-weight: 950;
   line-height: 1;
+}
+
+.lane-button .tile-title,
+.lane-button.recommended .tile-title {
+  width: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.28rem 0.45rem;
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.tile-word {
+  display: inline-flex;
+  flex-wrap: nowrap;
+  justify-content: center;
+  gap: 0.12rem;
+  max-width: 100%;
+}
+
+.menu-letter-tile {
+  width: 1.82rem;
+  height: 2.08rem;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(88, 62, 7, 0.22);
+  border-radius: 5px;
+  background: linear-gradient(180deg, #fff7cf, #ffd96d);
+  box-shadow: 0 2px 0 rgba(128, 86, 0, 0.16);
+  color: #3f2c02;
+  font-size: 0.95rem;
+  font-weight: 950;
+}
+
+.lane-button.recommended .menu-letter-tile {
+  width: 2rem;
+  height: 2.28rem;
+  border-color: rgba(88, 62, 7, 0.28);
+  background: linear-gradient(180deg, #fffbe2, #ffe071);
+  font-size: 1.05rem;
+}
+
+.lane-subtitle {
+  position: relative;
+  z-index: 1;
+  width: min(100%, 34rem);
+  color: var(--muted);
+  font-size: 0.9rem;
+  font-weight: 650;
+  line-height: 1.24;
+  overflow-wrap: break-word;
+  text-wrap: balance;
+}
+
+.lane-button.recommended .lane-subtitle {
+  color: #493100;
+  font-size: 0.94rem;
 }
 
 .menu-back {
@@ -489,6 +561,19 @@ h3 {
   align-items: center;
 }
 
+.letter-row.balanced {
+  display: grid;
+  justify-items: center;
+  gap: 0.5rem;
+}
+
+.letter-line {
+  display: flex;
+  flex-wrap: nowrap;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
 .letter-chip,
 .tile {
   width: var(--tile-size);
@@ -611,11 +696,25 @@ h3 {
 
 .flex-score {
   display: grid;
-  gap: 0.8rem;
-  padding: 0.95rem;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0.65rem 0.8rem;
+  padding: 0.75rem;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: #f8ffe8;
+}
+
+.session-panel[data-drill="flex"] .drill-card {
+  order: 1;
+}
+
+.session-panel[data-drill="flex"] .board-wrap {
+  order: 2;
+}
+
+.session-panel[data-drill="flex"] .session-footer {
+  order: 3;
 }
 
 .glue-status {
@@ -640,9 +739,9 @@ h3 {
 
 .board-score {
   display: grid;
-  justify-items: center;
+  justify-items: start;
   gap: 0.2rem;
-  text-align: center;
+  text-align: left;
 }
 
 .board-score > span {
@@ -654,7 +753,7 @@ h3 {
 
 .flex-score strong {
   display: block;
-  font-size: 3.1rem;
+  font-size: 2.35rem;
   line-height: 1;
 }
 
@@ -693,6 +792,23 @@ h3 {
 .flex-breakdown {
   display: grid;
   gap: 0.45rem;
+  margin-top: 0.55rem;
+}
+
+.flex-details {
+  grid-column: 1 / -1;
+  text-align: left;
+}
+
+.flex-details summary {
+  cursor: pointer;
+  color: var(--ink);
+  font-size: 0.9rem;
+  font-weight: 900;
+}
+
+.flex-details summary::marker {
+  color: var(--sun);
 }
 
 .flex-breakdown-item {
@@ -1205,13 +1321,22 @@ dialog::backdrop {
 
   .brand {
     min-width: 0;
-    gap: 0.75rem;
+    gap: 0.62rem;
   }
 
   .mascot {
-    width: 74px;
-    height: 74px;
-    font-size: 2.9rem;
+    width: 66px;
+    height: 66px;
+    font-size: 2.55rem;
+  }
+
+  h1 {
+    font-size: 2.25rem;
+  }
+
+  .brand-slogan {
+    margin-top: 0.16rem;
+    font-size: 0.92rem;
   }
 
   .practice-panel,
@@ -1222,6 +1347,40 @@ dialog::backdrop {
   .lane-copy {
     font-size: 0.92rem;
     line-height: 1.22;
+  }
+
+  .lane-button,
+  .lane-button.recommended {
+    min-height: auto;
+    padding: 0.68rem 0.58rem;
+    gap: 0.34rem;
+  }
+
+  .lane-button-grid {
+    gap: 0.5rem;
+  }
+
+  .lane-button .tile-title,
+  .lane-button.recommended .tile-title {
+    gap: 0.22rem 0.34rem;
+  }
+
+  .menu-letter-tile {
+    width: 1.48rem;
+    height: 1.76rem;
+    font-size: 0.78rem;
+  }
+
+  .lane-button.recommended .menu-letter-tile {
+    width: 1.62rem;
+    height: 1.9rem;
+    font-size: 0.86rem;
+  }
+
+  .lane-subtitle,
+  .lane-button.recommended .lane-subtitle {
+    font-size: 0.78rem;
+    line-height: 1.18;
   }
 
   .preset-card.recommended {
@@ -1289,6 +1448,42 @@ dialog::backdrop {
   }
 }
 
+@media (max-width: 350px) {
+  .app-shell {
+    padding-inline: max(0.5rem, env(safe-area-inset-left)) max(0.5rem, env(safe-area-inset-right));
+  }
+
+  .brand {
+    gap: 0.5rem;
+  }
+
+  .mascot {
+    width: 52px;
+    height: 52px;
+    font-size: 2rem;
+  }
+
+  h1 {
+    font-size: 1.84rem;
+  }
+
+  .brand-slogan {
+    font-size: 0.78rem;
+  }
+
+  .menu-letter-tile,
+  .lane-button.recommended .menu-letter-tile {
+    width: 1.22rem;
+    height: 1.48rem;
+    font-size: 0.64rem;
+  }
+
+  .lane-subtitle,
+  .lane-button.recommended .lane-subtitle {
+    font-size: 0.7rem;
+  }
+}
+
 @media (max-height: 720px) and (max-width: 520px) {
   .app-shell {
     padding-top: max(0.45rem, env(safe-area-inset-top));
@@ -1299,17 +1494,17 @@ dialog::backdrop {
   }
 
   .mascot {
-    width: 62px;
-    height: 62px;
-    font-size: 2.45rem;
+    width: 56px;
+    height: 56px;
+    font-size: 2.15rem;
   }
 
   h1 {
-    font-size: clamp(2.05rem, 9vw, 3.1rem);
+    font-size: 1.92rem;
   }
 
-  .brand-eyebrow {
-    font-size: clamp(0.9rem, 3.5vw, 1.1rem);
+  .brand-slogan {
+    font-size: 0.82rem;
   }
 
   .practice-panel {
@@ -1359,22 +1554,33 @@ dialog::backdrop {
 
   .lane-button,
   .lane-button.recommended {
-    min-height: 58px;
-    padding: 0.52rem;
+    min-height: 92px;
+    padding: 0.56rem;
+    gap: 0.32rem;
   }
 
   .lane-button.recommended {
-    min-height: 78px;
-    padding: 0.64rem;
+    min-height: 112px;
+    padding: 0.62rem;
     box-shadow: 0 3px 0 rgba(111, 76, 0, 0.18), 0 8px 16px rgba(128, 86, 0, 0.1);
   }
 
-  .lane-button strong {
-    font-size: clamp(1.35rem, 5.5vw, 1.8rem);
+  .menu-letter-tile {
+    width: 1.32rem;
+    height: 1.58rem;
+    font-size: 0.68rem;
   }
 
-  .lane-button.recommended strong {
-    font-size: clamp(1.48rem, 6vw, 2rem);
+  .lane-button.recommended .menu-letter-tile {
+    width: 1.42rem;
+    height: 1.68rem;
+    font-size: 0.74rem;
+  }
+
+  .lane-subtitle,
+  .lane-button.recommended .lane-subtitle {
+    font-size: 0.72rem;
+    line-height: 1.15;
   }
 
   .learn-card {
@@ -1447,6 +1653,29 @@ dialog::backdrop {
     width: min(100%, 680px);
     grid-column: 1 / -1;
     justify-self: center;
+  }
+
+  .session-panel[data-drill="flex"] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .session-panel[data-drill="flex"] .drill-card {
+    width: min(100%, 720px);
+    grid-column: 1 / -1;
+    grid-row: 2;
+    justify-self: center;
+  }
+
+  .session-panel[data-drill="flex"] .board-wrap {
+    width: min(100%, 760px);
+    grid-column: 1 / -1;
+    grid-row: 3;
+    justify-self: center;
+  }
+
+  .session-panel[data-drill="flex"] .session-footer {
+    grid-column: 1 / -1;
+    grid-row: 4;
   }
 
   .board-wrap {

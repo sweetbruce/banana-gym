@@ -25,10 +25,13 @@ const MAIN_PRACTICE_PRESETS = [
   { label: "10 min", seconds: 600, short: "A longer table-rhythm challenge." }
 ];
 
-const DAILY_WORKOUT_DRILL_POOL = [
+const DAILY_TILE_RUSH_POOL = [
   { id: "flash", seconds: 90, short: "Find 2-letter words.", wordMode: "twos", dailyKey: "flash-twos", practiceTitle: "Tile Rush: 2-Letter" },
   { id: "flash", seconds: 90, short: "Find 3-letter words.", wordMode: "threes", dailyKey: "flash-threes", practiceTitle: "Tile Rush: 3-Letter" },
-  { id: "flash", seconds: 90, short: "Find every possible word.", wordMode: "all", dailyKey: "flash-all", practiceTitle: "Tile Rush: All Words" },
+  { id: "flash", seconds: 90, short: "Find every possible word.", wordMode: "all", dailyKey: "flash-all", practiceTitle: "Tile Rush: All Words" }
+];
+
+const DAILY_TROUBLE_POOL = [
   { id: "trouble", seconds: 90, short: "Practice trouble tiles.", troubleProfile: "Messy Hand", dailyKey: "trouble", practiceTitle: "Trouble Tile" }
 ];
 
@@ -123,7 +126,7 @@ const LEARN_STEPS = [
   {
     key: "invalid",
     title: "Watch for Red Tiles",
-    copy: "Banana Gym checks the board after every move. Put Q and Z next to each other to see how invalid words get marked red.",
+    copy: "Brooke's Bananagram Gym checks the board after every move. Put Q and Z next to each other to see how invalid words get marked red.",
     goal: "Create one red invalid word.",
     waiting: "Place Q beside Z to trigger the red invalid highlight.",
     action: "Next"
@@ -146,7 +149,7 @@ const LEARN_STEPS = [
   },
   {
     key: "finish",
-    title: "Ready for Banana Gym",
+    title: "Ready for Brooke's Bananagram Gym",
     copy: "You have the basics: make valid connected words, cross through existing letters, trade in stuck tiles, and take one when your tray is empty.",
     goal: "Jump into a workout or pick one drill to practice.",
     action: "Back to Menu",
@@ -305,6 +308,11 @@ let state = {
   history: []
 };
 
+const uiFeedback = {
+  audioContext: null,
+  lastSoundAt: 0
+};
+
 const els = {
   splashScreen: document.querySelector("#splashScreen"),
   homeView: document.querySelector("#homeView"),
@@ -362,6 +370,7 @@ init();
 function init() {
   startSplashIntro();
   renderHome();
+  renderMainMenuTileLabels();
   renderSettings();
   renderDictionaryStatus();
   initBoard();
@@ -378,7 +387,19 @@ function startSplashIntro() {
   }, 1150);
 }
 
+function renderMainMenuTileLabels() {
+  document.querySelectorAll("[data-tile-label]").forEach((title) => {
+    const label = title.dataset.tileLabel || title.textContent || "";
+    title.innerHTML = label.trim().split(/\s+/).map((word) => `
+      <span class="tile-word">
+        ${[...word].map((char) => `<span class="menu-letter-tile">${escapeHtml(char)}</span>`).join("")}
+      </span>
+    `).join("");
+  });
+}
+
 function bindEvents() {
+  bindUiFeedback();
   els.dailyWorkoutButton.addEventListener("click", openDailyWorkoutIntro);
   els.practiceDrillsButton.addEventListener("click", () => showHomeMenu("drills"));
   els.timeTrialsButton.addEventListener("click", () => showHomeMenu("trials"));
@@ -420,6 +441,59 @@ function bindEvents() {
   els.tray.addEventListener("click", () => {
     if (state.selectedTileId) moveTileToTray(state.selectedTileId);
   });
+}
+
+function bindUiFeedback() {
+  document.addEventListener("click", (event) => {
+    const target = event.target instanceof Element ? event.target : event.target?.parentElement;
+    const button = target?.closest("button");
+    if (!button || button.disabled || !isFeedbackButton(button)) return;
+    triggerUiFeedback(button.classList.contains("primary") || button.classList.contains("recommended") ? "primary" : "tap");
+  }, { passive: true });
+}
+
+function isFeedbackButton(button) {
+  return Boolean(button.closest("#homeView, #dailyWorkoutDialog, #settingsDialog"));
+}
+
+function triggerUiFeedback(kind = "tap") {
+  triggerHaptic(kind);
+  playUiSound(kind);
+}
+
+function triggerHaptic(kind) {
+  if (!navigator.vibrate) return;
+  navigator.vibrate(kind === "primary" ? 18 : 8);
+}
+
+function playUiSound(kind) {
+  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+  if (!AudioContextClass) return;
+  const now = Date.now();
+  if (now - uiFeedback.lastSoundAt < 45) return;
+  uiFeedback.lastSoundAt = now;
+
+  try {
+    const context = uiFeedback.audioContext || new AudioContextClass();
+    uiFeedback.audioContext = context;
+    if (context.state === "suspended") context.resume();
+
+    const start = context.currentTime;
+    const oscillator = context.createOscillator();
+    const gain = context.createGain();
+    oscillator.type = "sine";
+    oscillator.frequency.setValueAtTime(kind === "primary" ? 660 : 480, start);
+    oscillator.frequency.exponentialRampToValueAtTime(kind === "primary" ? 880 : 540, start + 0.06);
+    gain.gain.setValueAtTime(0.0001, start);
+    gain.gain.exponentialRampToValueAtTime(kind === "primary" ? 0.035 : 0.024, start + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.08);
+    oscillator.connect(gain);
+    gain.connect(context.destination);
+    oscillator.start(start);
+    oscillator.stop(start + 0.09);
+  } catch {
+    uiFeedback.audioContext = null;
+  }
 }
 
 function renderHome() {
@@ -530,9 +604,11 @@ function startDailyWorkout() {
 
 function buildDailyWorkoutSteps() {
   const finisher = { ...randomItem(DAILY_WORKOUT_FINISHERS) };
+  const tileRush = { ...randomItem(DAILY_TILE_RUSH_POOL) };
+  const troubleTile = { ...randomItem(DAILY_TROUBLE_POOL) };
   if (finisher.id === "peel") finisher.fixedLetters = shuffle(randomItem(TIME_TRIAL_STARTER_RACKS));
   return [
-    ...shuffle(DAILY_WORKOUT_DRILL_POOL).slice(0, 2),
+    ...shuffle([tileRush, troubleTile]),
     finisher
   ];
 }
@@ -707,17 +783,19 @@ function recordWorkoutResult(session) {
 function makeWorkoutResult(session) {
   const title = session.practiceTitle || (session.drillId === "peel" ? "Time Trial" : DRILLS[session.drillId]?.name || "Drill");
   if (session.drillId === "flash") {
+    const missed = session.flashMissed?.length ?? Math.max(0, (session.flashPossibleCount || 0) - (session.flashFoundCount || 0));
     return {
       title,
       score: formatPercent(session.flashFoundCount || 0, session.flashPossibleCount || 0),
-      detail: `${session.flashFoundCount || 0}/${session.flashPossibleCount || 0} words found`
+      detail: `${session.flashFoundCount || 0} found, ${missed} missed`
     };
   }
   if (session.drillId === "trouble") {
+    const missed = session.troubleMissed?.length ?? Math.max(0, (session.troublePossibleCount || 0) - (session.troubleFoundCount || 0));
     return {
       title,
       score: formatPercent(session.troubleFoundCount || 0, session.troublePossibleCount || 0),
-      detail: `${session.troubleFoundCount || 0}/${session.troublePossibleCount || 0} words using ${session.troubleLetter || "-"}`
+      detail: `${session.troubleFoundCount || 0} found, ${missed} missed using ${session.troubleLetter || "-"}`
     };
   }
   if (session.drillId === "glue") {
@@ -793,6 +871,12 @@ function renderSummary() {
   els.summaryDetails.innerHTML = "";
   const current = state.session;
   const isFinalDailySummary = current?.mode === "daily" && state.pendingWorkoutStep === null;
+  const flashMissedCount = current?.drillId === "flash"
+    ? current.flashMissed?.length ?? Math.max(0, (current.flashPossibleCount || 0) - (current.flashFoundCount || 0))
+    : 0;
+  const troubleMissedCount = current?.drillId === "trouble"
+    ? current.troubleMissed?.length ?? Math.max(0, (current.troublePossibleCount || 0) - (current.troubleFoundCount || 0))
+    : 0;
   els.summaryTitle.textContent = isFinalDailySummary ? "Workout Complete" : "Round Complete";
   const metrics = current?.drillId === "peel"
     ? [
@@ -816,15 +900,15 @@ function renderSummary() {
     : current?.drillId === "flash"
       ? [
           ["Score", formatPercent(current.flashFoundCount || 0, current.flashPossibleCount || 0)],
-          ["Possible", current.flashPossibleCount || 0],
-          ["Found", current.flashFoundCount || 0]
+          ["Found", current.flashFoundCount || 0],
+          ["Missed", flashMissedCount]
         ]
     : current?.drillId === "trouble"
       ? [
           ["Score", formatPercent(current.troubleFoundCount || 0, current.troublePossibleCount || 0)],
-          ["Trouble", current.troubleLetter || "-"],
-          ["Possible", current.troublePossibleCount || 0],
-          ["Found", current.troubleFoundCount || 0]
+          ["Found", current.troubleFoundCount || 0],
+          ["Missed", troubleMissedCount],
+          ["Trouble", current.troubleLetter || "-"]
         ]
     : [
         ["Words", current?.words || 0],
@@ -868,8 +952,8 @@ function summaryLine() {
   if (state.session.drillId === "peel") return "Good run. Letters placed is the score to beat next time.";
   if (state.session.drillId === "flex") return "Board score rewards hooks that keep the grid open and crosses that make tiles work twice.";
   if (state.session.drillId === "glue") return state.session.glueSolved ? "All word islands are connected." : "Glue Words ends when every word island becomes one connected valid board.";
-  if (state.session.drillId === "flash") return "Review the possible words, then the words you found.";
-  if (state.session.drillId === "trouble") return `Review the possible words using ${state.session.troubleLetter || "the trouble tile"}, then the words you found.`;
+  if (state.session.drillId === "flash") return "Review what you found and what you missed.";
+  if (state.session.drillId === "trouble") return `Review what you found and missed using ${state.session.troubleLetter || "the trouble tile"}.`;
   if (state.session.dumps > state.session.peels) return "A lot of tiles got traded in today. Next session will keep an eye on trouble tiles.";
   if (state.session.peels > 1) return "Nice Take 1 tempo. The grid work is starting to behave.";
   return "Solid reps. Short daily practice is how the word reflex gets built.";
@@ -973,10 +1057,6 @@ function renderFlash() {
   els.drillPrompt.textContent = mode.prompt;
   els.drillSurface.innerHTML = `
     <div class="flash-panel">
-      <div class="trouble-focus">
-        <span>Target</span>
-        <strong>${escapeHtml(mode.label)}</strong>
-      </div>
       <div class="attempt-log">
         <div class="attempt-list">
           <strong>&#127820; Valid</strong>
@@ -987,9 +1067,9 @@ function renderFlash() {
           <div id="invalidAttempts"></div>
         </div>
       </div>
-      <div class="letter-row">${letters.map((letter) => `<span class="letter-chip">${letter}</span>`).join("")}</div>
+      ${renderLetterRows(letters)}
       <div class="word-entry">
-        <input id="wordInput" maxlength="32" placeholder="Type a word">
+        <input id="wordInput" maxlength="32" placeholder="${escapeHtml(getWordInputPlaceholder(mode))}">
         <button id="submitWord">Submit</button>
       </div>
       <p id="wordFeedback"></p>
@@ -1192,10 +1272,6 @@ function renderTrouble() {
   els.drillPrompt.textContent = `${setup.profile.label}: find valid words from these tiles that use ${trouble}.`;
   els.drillSurface.innerHTML = `
     <div class="flash-panel">
-      <div class="trouble-focus">
-        <span>Use this tile</span>
-        <strong class="letter-chip focus">${trouble}</strong>
-      </div>
       <div class="attempt-log">
         <div class="attempt-list">
           <strong>&#127820; Valid</strong>
@@ -1206,9 +1282,9 @@ function renderTrouble() {
           <div id="invalidAttempts"></div>
         </div>
       </div>
-      <div class="letter-row">${letters.map((letter, index) => `<span class="letter-chip ${index === 0 ? "focus" : ""}">${letter}</span>`).join("")}</div>
+      ${renderLetterRows(letters, 0)}
       <div class="word-entry">
-        <input id="wordInput" maxlength="32" placeholder="Type a word">
+        <input id="wordInput" maxlength="32" placeholder="Enter a word using ${escapeHtml(trouble)}">
         <button id="submitWord">Submit</button>
       </div>
       <p id="wordFeedback"></p>
@@ -1268,13 +1344,47 @@ function renderFlex() {
         <em id="flexScoreLabel">Start building</em>
       </div>
       <div class="flex-metrics" id="flexMetrics"></div>
-      <p class="score-notes" id="flexNotes">Hooks keep the board expandable. Crosses make more words with fewer tiles.</p>
-      <div class="flex-breakdown" id="flexBreakdown"></div>
+      <details class="flex-details">
+        <summary>Score details</summary>
+        <p class="score-notes" id="flexNotes">Hooks keep the board expandable. Crosses make more words with fewer tiles.</p>
+        <div class="flex-breakdown" id="flexBreakdown"></div>
+      </details>
     </div>
   `;
   els.sessionActions.innerHTML = `<button id="finishFlex" class="primary">Done</button>`;
   resetTiles(14);
   document.querySelector("#finishFlex").addEventListener("click", completeRound);
+}
+
+function getWordInputPlaceholder(mode) {
+  if (mode.targetLength === 2) return "Enter any 2-letter word";
+  if (mode.targetLength === 3) return "Enter any 3-letter word";
+  return "Enter any valid word";
+}
+
+function renderLetterRows(letters, focusIndices = []) {
+  const focusSet = new Set(Array.isArray(focusIndices) ? focusIndices : [focusIndices]);
+  const rows = splitLetterRows(letters);
+  let offset = 0;
+  return `
+    <div class="letter-row balanced">
+      ${rows.map((row) => {
+        const rowMarkup = row.map((letter, index) => {
+          const letterIndex = offset + index;
+          const focusClass = focusSet.has(letterIndex) ? " focus" : "";
+          return `<span class="letter-chip${focusClass}">${escapeHtml(letter)}</span>`;
+        }).join("");
+        offset += row.length;
+        return `<div class="letter-line">${rowMarkup}</div>`;
+      }).join("")}
+    </div>
+  `;
+}
+
+function splitLetterRows(letters) {
+  if (letters.length <= 6) return [letters];
+  const firstRowCount = Math.ceil(letters.length / 2);
+  return [letters.slice(0, firstRowCount), letters.slice(firstRowCount)];
 }
 
 function renderPeel() {
@@ -1663,14 +1773,15 @@ function renderFlashSummaryDetails(session) {
   const mode = WORD_FINDING_MODES[session.flashMode] || WORD_FINDING_MODES.twos;
   const possible = session.flashAnswers || getPossibleWordsForMode(session.flashLetters || [], mode);
   const found = session.flashFound || [];
+  const missed = session.flashMissed || possible.filter((word) => !found.includes(word));
   els.summaryDetails.innerHTML = `
-    <div class="summary-list">
-      <strong>Possible ${escapeHtml(session.flashLabel || mode.label)}</strong>
-      <div>${renderWordPills(possible)}</div>
-    </div>
     <div class="summary-list">
       <strong>Found Words</strong>
       <div>${renderWordPills(found, "None yet")}</div>
+    </div>
+    <div class="summary-list">
+      <strong>Missed Words</strong>
+      <div>${renderWordPills(missed, "None")}</div>
     </div>
   `;
 }
@@ -1681,18 +1792,19 @@ function renderTroubleSummaryDetails(session) {
     trouble: session.troubleLetter || ""
   });
   const found = session.troubleFound || [];
+  const missed = session.troubleMissed || possible.filter((word) => !found.includes(word));
   els.summaryDetails.innerHTML = `
     <div class="summary-list">
       <strong>Trouble Letter</strong>
       <div><span class="letter-chip focus">${escapeHtml(session.troubleLetter || "-")}</span></div>
     </div>
     <div class="summary-list">
-      <strong>Possible Words From These Tiles</strong>
-      <div>${renderWordPills(possible)}</div>
-    </div>
-    <div class="summary-list">
       <strong>Found Words</strong>
       <div>${renderWordPills(found, "None yet")}</div>
+    </div>
+    <div class="summary-list">
+      <strong>Missed Words</strong>
+      <div>${renderWordPills(missed, "None")}</div>
     </div>
   `;
 }
