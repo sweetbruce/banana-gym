@@ -26,15 +26,26 @@ const MAIN_PRACTICE_PRESETS = [
 ];
 
 const DAILY_WORKOUT_DRILL_POOL = [
-  { id: "flash", seconds: 45, short: "Find 2-letter words.", wordMode: "twos", dailyKey: "flash-twos" },
-  { id: "flash", seconds: 45, short: "Find 3-letter words.", wordMode: "threes", dailyKey: "flash-threes" },
-  { id: "trouble", seconds: 45, short: "Practice trouble tiles.", troubleProfile: "Messy Hand", dailyKey: "trouble" },
-  { id: "flex", seconds: 45, short: "Build hooks and crosses.", dailyKey: "flex" }
+  { id: "flash", seconds: 90, short: "Find 2-letter words.", wordMode: "twos", dailyKey: "flash-twos", practiceTitle: "Tile Rush: 2-Letter" },
+  { id: "flash", seconds: 90, short: "Find 3-letter words.", wordMode: "threes", dailyKey: "flash-threes", practiceTitle: "Tile Rush: 3-Letter" },
+  { id: "flash", seconds: 90, short: "Find every possible word.", wordMode: "all", dailyKey: "flash-all", practiceTitle: "Tile Rush: All Words" },
+  { id: "trouble", seconds: 90, short: "Practice trouble tiles.", troubleProfile: "Messy Hand", dailyKey: "trouble", practiceTitle: "Trouble Tile" }
 ];
 
-const DAILY_WORKOUT_TIME_TRIAL = { id: "peel", seconds: 90, short: "Finish with a time trial." };
+const DAILY_WORKOUT_FINISHERS = [
+  { id: "flex", seconds: 120, short: "Build hooks and crosses.", dailyKey: "flex", practiceTitle: "Hooks & Crosses" },
+  { id: "peel", seconds: 120, short: "Finish with a time trial.", dailyKey: "peel", practiceTitle: "Time Trial" }
+];
 
 const DRILL_ORDER = ["flash", "trouble", "flex"];
+
+const PRACTICE_DRILL_OPTIONS = [
+  { id: "flash", label: "Tile Rush: 2-Letter", short: "Find every 2-letter word in the hand.", wordMode: "twos" },
+  { id: "flash", label: "Tile Rush: 3-Letter", short: "Find every 3-letter word in the hand.", wordMode: "threes" },
+  { id: "flash", label: "Tile Rush: All Words", short: "Larger hand. Find every valid word you can make.", wordMode: "all" },
+  { id: "trouble", label: "Trouble Tile", short: "Find words that use an awkward tile.", troubleProfile: null },
+  { id: "flex", label: "Hooks & Crosses", short: "Build boards with growth points and crossings." }
+];
 
 const TIME_TRIAL_STARTER_RACKS = [
   ["T", "R", "A", "I", "N", "S", "E", "L", "D", "O", "P", "M"],
@@ -63,6 +74,15 @@ const WORD_FINDING_MODES = {
     minPossible: 6,
     maxPossible: 24,
     prompt: "Find valid 3-letter words you can make from these tiles."
+  },
+  all: {
+    id: "all",
+    label: "all words",
+    rackSize: 10,
+    seedCount: 6,
+    minPossible: 18,
+    maxPossible: 70,
+    prompt: "Find every valid word you can make from this larger hand."
   }
 };
 
@@ -413,14 +433,13 @@ function renderHome() {
   });
 
   els.presetGrid.innerHTML = "";
-  const visibleDrills = DRILL_ORDER.filter((id) => state.settings.enabledDrills[id]);
-  const drillIds = visibleDrills.length ? visibleDrills : DRILL_ORDER;
-  drillIds.forEach((id) => {
-    const drill = DRILLS[id];
+  const visibleOptions = PRACTICE_DRILL_OPTIONS.filter((option) => state.settings.enabledDrills[option.id]);
+  const drillOptions = visibleOptions.length ? visibleOptions : PRACTICE_DRILL_OPTIONS;
+  drillOptions.forEach((option) => {
     const button = document.createElement("button");
-    button.className = `preset-card ${id === "peel" ? "recommended" : ""}`;
-    button.innerHTML = `<strong>${drill.name}</strong><span>${drill.short}</span>`;
-    button.addEventListener("click", () => startDrill(id));
+    button.className = "preset-card";
+    button.innerHTML = `<strong>${option.label}</strong><span>${option.short}</span>`;
+    button.addEventListener("click", () => startDrill(option.id, option));
     els.presetGrid.append(button);
   });
 }
@@ -510,13 +529,11 @@ function startDailyWorkout() {
 }
 
 function buildDailyWorkoutSteps() {
-  const timeTrial = {
-    ...DAILY_WORKOUT_TIME_TRIAL,
-    fixedLetters: shuffle(randomItem(TIME_TRIAL_STARTER_RACKS))
-  };
+  const finisher = { ...randomItem(DAILY_WORKOUT_FINISHERS) };
+  if (finisher.id === "peel") finisher.fixedLetters = shuffle(randomItem(TIME_TRIAL_STARTER_RACKS));
   return [
     ...shuffle(DAILY_WORKOUT_DRILL_POOL).slice(0, 2),
-    timeTrial
+    finisher
   ];
 }
 
@@ -538,6 +555,7 @@ function startWorkoutStep(index) {
     wordMode: step.wordMode || null,
     troubleProfile: step.troubleProfile || null,
     fixedLetters: step.fixedLetters || null,
+    practiceTitle: step.practiceTitle || null,
     timerId: null,
     tilesDrawn: step.id === "peel" ? (step.fixedLetters?.length || 12) : 0
   });
@@ -548,10 +566,15 @@ function startWorkoutStep(index) {
   if (state.session.timeLimitSeconds) tickMainPractice();
 }
 
-function startDrill(id) {
+function startDrill(id, options = {}) {
   state.workout = null;
   state.pendingWorkoutStep = null;
-  state.session = createSession(id, { mode: "drill" });
+  state.session = createSession(id, {
+    mode: "drill",
+    wordMode: options.wordMode || null,
+    troubleProfile: options.troubleProfile || null,
+    practiceTitle: options.label || options.practiceTitle || null
+  });
   resetTiles(12);
   loadDrill(id);
   showView("session");
@@ -588,7 +611,7 @@ function createSession(id, overrides = {}) {
 
 function loadDrill(id) {
   const drill = DRILLS[id];
-  const title = id === "peel" ? "Main Practice" : drill.name;
+  const title = state.session.practiceTitle || (id === "peel" ? "Main Practice" : drill.name);
   const isDaily = state.session.mode === "daily";
   els.sessionView.dataset.drill = id;
   els.currentDrillName.textContent = title;
@@ -682,7 +705,7 @@ function recordWorkoutResult(session) {
 }
 
 function makeWorkoutResult(session) {
-  const title = session.drillId === "peel" ? "Time Trial" : DRILLS[session.drillId]?.name || "Drill";
+  const title = session.practiceTitle || (session.drillId === "peel" ? "Time Trial" : DRILLS[session.drillId]?.name || "Drill");
   if (session.drillId === "flash") {
     return {
       title,
@@ -740,6 +763,7 @@ function getRoundConfig(session) {
     timeLimitSeconds: session.timeLimitSeconds || null,
     troubleProfile: session.troubleProfile || null,
     wordMode: session.wordMode || null,
+    practiceTitle: session.practiceTitle || null,
     fixedLetters: session.fixedLetters ? [...session.fixedLetters] : null
   };
 }
@@ -760,7 +784,7 @@ function playAgain() {
   }
   if (round.mode === "main") startMainPractice(round.timeLimitSeconds || MAIN_PRACTICE_PRESETS[1].seconds);
   else if (round.mode === "daily") startDailyWorkout();
-  else startDrill(round.drillId);
+  else startDrill(round.drillId, round);
 }
 
 function renderSummary() {
@@ -815,7 +839,7 @@ function renderSummary() {
   if (isFinalDailySummary) renderWorkoutSummaryDetails();
 
   if (current?.mode === "daily") {
-    els.playAgainButton.textContent = state.pendingWorkoutStep !== null ? "Next Exercise" : "Repeat 3-Min Workout";
+    els.playAgainButton.textContent = state.pendingWorkoutStep !== null ? "Next Exercise" : "Repeat 5-Min Workout";
     els.doneButton.textContent = "Back to Menu";
   } else {
     els.playAgainButton.textContent = "Play Again";
@@ -974,7 +998,7 @@ function renderFlash() {
   els.sessionActions.innerHTML = `<button id="finishFlash" class="primary">Done</button>`;
   bindWordInput(letters, {
     trackAttempts: true,
-    isTargetWord: (word) => word.length === mode.targetLength,
+    isTargetWord: (word) => wordMatchesMode(word, mode),
     offTargetMessage: (word) => `${word} is valid, but this round is only ${mode.label}.`
   });
   document.querySelector("#finishFlash").addEventListener("click", finishTileFlash);
