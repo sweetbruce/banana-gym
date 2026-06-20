@@ -8,8 +8,19 @@
     <link rel="stylesheet" href="styles.css">
   </head>
   <body>
-    <div class="splash-screen" id="splashScreen" aria-hidden="true">
-      <div class="splash-mark">&#127820;</div>
+    <div class="splash-screen" id="splashScreen">
+      <div class="splash-stack">
+        <div class="splash-mark" aria-hidden="true">&#127820;</div>
+        <div class="welcome-card" id="welcomeCard" hidden>
+          <p class="welcome-kicker">Welcome to Brooke's Bananagram Gym</p>
+          <h2>New to Bananagrams?</h2>
+          <p>Take a quick guided lesson, or jump straight into practice.</p>
+          <div class="welcome-actions">
+            <button class="primary" id="welcomeLearnButton" type="button">Learn to Play</button>
+            <button id="welcomeSkipButton" type="button">Go to Main Menu</button>
+          </div>
+        </div>
+      </div>
     </div>
 
     <div class="app-shell">
@@ -155,6 +166,11 @@
             <option value="casual">Casual</option>
             <option value="competitive">Competitive</option>
           </select>
+        </label>
+
+        <label class="field">
+          <span>Arcade name</span>
+          <input id="playerNameInput" maxlength="18" placeholder="Player 1234" autocomplete="nickname">
         </label>
 
         <label class="toggle-row">

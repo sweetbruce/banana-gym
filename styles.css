@@ -37,6 +37,7 @@ body {
   z-index: 100;
   display: grid;
   place-items: center;
+  padding: max(1rem, env(safe-area-inset-top)) max(1rem, env(safe-area-inset-right)) max(1rem, env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left));
   background: var(--banana);
   opacity: 1;
   transition: opacity 420ms ease;
@@ -44,6 +45,13 @@ body {
 
 .splash-screen.leaving {
   opacity: 0;
+}
+
+.splash-stack {
+  width: min(100%, 390px);
+  display: grid;
+  justify-items: center;
+  gap: 1rem;
 }
 
 .splash-mark {
@@ -57,6 +65,45 @@ body {
   box-shadow: 0 18px 48px rgba(80, 56, 8, 0.18);
   font-size: 6.9rem;
   line-height: 1;
+}
+
+.welcome-card {
+  width: 100%;
+  display: grid;
+  gap: 0.7rem;
+  padding: 1.05rem;
+  border: 1px solid rgba(77, 55, 9, 0.2);
+  border-radius: 8px;
+  background: rgba(255, 250, 240, 0.94);
+  box-shadow: 0 16px 44px rgba(80, 56, 8, 0.2);
+  text-align: center;
+}
+
+.welcome-card[hidden] {
+  display: none;
+}
+
+.welcome-card h2 {
+  font-size: clamp(1.55rem, 7vw, 2rem);
+  line-height: 1.05;
+}
+
+.welcome-card p {
+  color: var(--muted);
+  line-height: 1.32;
+}
+
+.welcome-kicker {
+  font-size: 0.86rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0;
+}
+
+.welcome-actions {
+  display: grid;
+  gap: 0.55rem;
+  margin-top: 0.15rem;
 }
 
 button,
@@ -393,6 +440,11 @@ h3 {
   background: linear-gradient(180deg, #fff6c4, #fffdfa);
 }
 
+.preset-card.is-complete,
+.lane-button.is-complete {
+  border-color: rgba(124, 179, 66, 0.45);
+}
+
 .preset-card strong {
   display: block;
   font-size: clamp(1.12rem, 4.8vw, 1.34rem);
@@ -404,6 +456,29 @@ h3 {
   color: var(--muted);
   font-size: clamp(0.86rem, 3.7vw, 0.98rem);
   line-height: 1.24;
+}
+
+.personal-best-badge {
+  display: inline-grid;
+  place-items: center;
+  justify-self: center;
+  margin-top: 0.42rem;
+  padding: 0.18rem 0.5rem;
+  border: 1px solid rgba(124, 179, 66, 0.28);
+  border-radius: 999px;
+  background: #f1ffd7;
+  color: #3f6212;
+  font-size: 0.78rem;
+  font-style: normal;
+  font-weight: 950;
+}
+
+.preset-card .completion-mark,
+.lane-button .completion-mark {
+  display: inline;
+  color: #3f6212;
+  font-size: 0.9em;
+  white-space: nowrap;
 }
 
 .drill-grid .preset-card {
@@ -520,6 +595,50 @@ h3 {
 .flash-panel {
   display: grid;
   gap: 0.6rem;
+}
+
+.unscramble-status {
+  color: var(--muted);
+  font-size: 0.92rem;
+  font-weight: 900;
+  text-align: center;
+}
+
+.unscramble-targets {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem;
+}
+
+.unscramble-target {
+  min-height: 70px;
+  display: grid;
+  align-content: center;
+  gap: 0.25rem;
+  padding: 0.65rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 253, 250, 0.78);
+  text-align: center;
+}
+
+.unscramble-target strong {
+  font-size: 0.92rem;
+}
+
+.unscramble-target span {
+  color: var(--muted);
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+.unscramble-target.solved {
+  border-color: rgba(124, 179, 66, 0.48);
+  background: #f1ffd7;
+}
+
+.unscramble-target.solved span {
+  color: #3f6212;
 }
 
 .letter-row,
@@ -1171,6 +1290,72 @@ h3 {
   line-height: 1.25;
 }
 
+.leaderboard-card {
+  display: grid;
+  gap: 0.55rem;
+  margin-top: 0.55rem;
+  padding: 0.65rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fffdfa;
+  text-align: left;
+}
+
+.leaderboard-card > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+
+.leaderboard-card strong {
+  font-size: 0.95rem;
+}
+
+.leaderboard-card span,
+.leaderboard-card p {
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.25;
+}
+
+.leaderboard-rows {
+  display: grid;
+  gap: 0.3rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.leaderboard-rows li {
+  display: grid;
+  grid-template-columns: 2rem 1fr auto;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 38px;
+  padding: 0.35rem 0.45rem;
+  border-radius: 8px;
+  background: #fff6c4;
+}
+
+.leaderboard-rows li span {
+  display: grid;
+  place-items: center;
+  width: 1.55rem;
+  height: 1.55rem;
+  border-radius: 50%;
+  background: var(--banana);
+  color: var(--ink);
+  font-size: 0.78rem;
+  font-weight: 950;
+}
+
+.leaderboard-rows li em {
+  color: var(--ink);
+  font-style: normal;
+  font-weight: 950;
+}
+
 dialog {
   width: min(92vw, 520px);
   max-height: min(86vh, 680px);
@@ -1255,12 +1440,17 @@ dialog::backdrop {
   border-bottom: 1px solid var(--line);
 }
 
-.field select {
+.field select,
+.field input {
   min-height: 44px;
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 0 0.6rem;
   background: #fffdfa;
+}
+
+.field input {
+  width: min(100%, 190px);
 }
 
 .drill-settings {
@@ -1340,6 +1530,10 @@ dialog::backdrop {
     gap: 0.34rem;
   }
 
+  .lane-button.recommended {
+    min-height: clamp(86px, 10dvh, 108px);
+  }
+
   .lane-button-grid {
     gap: 0.5rem;
   }
@@ -1389,23 +1583,27 @@ dialog::backdrop {
   }
 
   .session-panel[data-drill="flash"] .attempt-list strong,
-  .session-panel[data-drill="trouble"] .attempt-list strong {
+  .session-panel[data-drill="trouble"] .attempt-list strong,
+  .session-panel[data-drill="unscramble"] .attempt-list strong {
     margin-bottom: 0.25rem;
   }
 
   .session-panel[data-drill="flash"] .letter-row,
-  .session-panel[data-drill="trouble"] .letter-row {
+  .session-panel[data-drill="trouble"] .letter-row,
+  .session-panel[data-drill="unscramble"] .letter-row {
     justify-content: center;
   }
 
   .session-panel[data-drill="flash"] .word-entry input,
-  .session-panel[data-drill="trouble"] .word-entry input {
+  .session-panel[data-drill="trouble"] .word-entry input,
+  .session-panel[data-drill="unscramble"] .word-entry input {
     flex: 1 1 0;
     min-width: 0;
   }
 
   .session-panel[data-drill="flash"] .word-entry button,
-  .session-panel[data-drill="trouble"] .word-entry button {
+  .session-panel[data-drill="trouble"] .word-entry button,
+  .session-panel[data-drill="unscramble"] .word-entry button {
     flex: 0 0 104px;
     padding-inline: 0.45rem;
   }

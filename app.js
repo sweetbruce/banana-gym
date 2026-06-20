@@ -1,5 +1,6 @@
 const DRILLS = {
   flash: { name: "Tile Rush", short: "Find 2- and 3-letter words from loose tiles." },
+  unscramble: { name: "Unscramble", short: "Spot the big word and its smaller partner." },
   glue: { name: "Glue Words", short: "Place short connector words." },
   trouble: { name: "Trouble Tile", short: "Find words in this rack that use an awkward tile." },
   flex: { name: "Hooks & Crosses", short: "Build boards with growth points and crossings." },
@@ -12,14 +13,20 @@ const DRILLS = {
 const DEFAULT_SETTINGS = {
   difficulty: "casual",
   adaptive: true,
+  playerName: "",
   enabledDrills: {
     flash: true,
+    unscramble: true,
     trouble: true,
     flex: true
   }
 };
 
 const TIME_TRIAL_SECONDS = 120;
+const TIME_TRIAL_DURATIONS = [120, 300];
+const LEADERBOARD_LIMIT = 5;
+const LEADERBOARD_TABLE = "banana_gym_scores";
+const LEADERBOARD_CONFIG = globalThis.BANANA_GYM_LEADERBOARD || {};
 
 const TIME_TRIAL_MODES = [
   {
@@ -27,7 +34,7 @@ const TIME_TRIAL_MODES = [
     id: "peel",
     label: "Words Trial",
     practiceTitle: "Words Trial",
-    short: "2 min. Score every valid word on the board.",
+    short: "Score every valid word on the board.",
     prompt: "Build fast. Your score is the number of valid words on the board."
   },
   {
@@ -35,7 +42,7 @@ const TIME_TRIAL_MODES = [
     id: "peel",
     label: "Letters Trial",
     practiceTitle: "Letters Trial",
-    short: "2 min. Score every valid letter you place.",
+    short: "Score every valid letter you place.",
     prompt: "Build fast. Your score is the number of valid letters on the board."
   },
   {
@@ -43,7 +50,7 @@ const TIME_TRIAL_MODES = [
     id: "peel",
     label: "Score Trial",
     practiceTitle: "Score Trial",
-    short: "2 min. Score valid words using Scrabble letter values.",
+    short: "Score valid words using Scrabble letter values.",
     prompt: "Build higher-value words. Your score uses Scrabble letter values without board multipliers."
   },
   {
@@ -51,7 +58,7 @@ const TIME_TRIAL_MODES = [
     id: "flex",
     label: "Hooks & Crosses Trial",
     practiceTitle: "Hooks & Crosses Trial",
-    short: "2 min. Build the most flexible board you can.",
+    short: "Build the most flexible board you can.",
     prompt: "Build a board with open hooks and crosses. Your board score is the target."
   }
 ];
@@ -68,13 +75,16 @@ const DAILY_TROUBLE_POOL = [
 
 const DAILY_WORKOUT_FINISHERS = TIME_TRIAL_MODES;
 
-const DRILL_ORDER = ["flash", "trouble", "flex"];
+const DRILL_ORDER = ["flash", "unscramble", "trouble", "flex"];
 const TROUBLE_LETTERS = ["J", "Q", "X", "Z", "K", "V"];
+const UNSCRAMBLE_RACK_SIZE = 10;
+const UNSCRAMBLE_BIG_LENGTHS = [6, 7, 8];
 
 const PRACTICE_DRILL_OPTIONS = [
   { id: "flash", label: "Tile Rush: 2-Letter", short: "Find every 2-letter word in the hand.", wordMode: "twos" },
   { id: "flash", label: "Tile Rush: 3-Letter", short: "Find every 3-letter word in the hand.", wordMode: "threes" },
   { id: "flash", label: "Tile Rush: All Words", short: "Larger hand. Find every valid word you can make.", wordMode: "all" },
+  { id: "unscramble", label: "Unscramble", short: "Find one big word and one smaller word from 10 tiles." },
   ...TROUBLE_LETTERS.map((letter) => ({
     id: "trouble",
     label: `Trouble Tile: ${letter}`,
@@ -325,6 +335,7 @@ const DICTIONARY_STORAGE_KEY = "bananaGymDictionary.v2";
 let dictionaryState = loadDictionary();
 let WORD_SET = new Set(dictionaryState.words);
 let glueWordDataCache = null;
+let wordLengthDataCache = null;
 const STORAGE_KEY = "bananaGymState";
 const BOARD_SIZE = 11;
 
@@ -353,6 +364,9 @@ const uiFeedback = {
 
 const els = {
   splashScreen: document.querySelector("#splashScreen"),
+  welcomeCard: document.querySelector("#welcomeCard"),
+  welcomeLearnButton: document.querySelector("#welcomeLearnButton"),
+  welcomeSkipButton: document.querySelector("#welcomeSkipButton"),
   homeView: document.querySelector("#homeView"),
   sessionView: document.querySelector("#sessionView"),
   summaryView: document.querySelector("#summaryView"),
@@ -377,6 +391,7 @@ const els = {
   importDictionaryButton: document.querySelector("#importDictionaryButton"),
   resetDictionaryButton: document.querySelector("#resetDictionaryButton"),
   difficultySelect: document.querySelector("#difficultySelect"),
+  playerNameInput: document.querySelector("#playerNameInput"),
   adaptiveToggle: document.querySelector("#adaptiveToggle"),
   resetSettingsButton: document.querySelector("#resetSettingsButton"),
   saveSettingsButton: document.querySelector("#saveSettingsButton"),
@@ -406,30 +421,58 @@ const els = {
 init();
 
 function init() {
-  startSplashIntro();
   renderHome();
   renderSettings();
   renderDictionaryStatus();
   initBoard();
   bindEvents();
+  startSplashIntro();
 }
 
 function startSplashIntro() {
   if (!els.splashScreen) return;
+  if (!state.stats.welcomeChoiceMade) {
+    showWelcomePrompt();
+    return;
+  }
+  fadeSplash();
+}
+
+function showWelcomePrompt() {
+  if (!els.welcomeCard) {
+    fadeSplash();
+    return;
+  }
+  els.welcomeCard.hidden = false;
+  els.splashScreen.classList.add("awaiting-welcome");
+}
+
+function completeWelcomeChoice(destination) {
+  state.stats.welcomeChoiceMade = true;
+  saveAll();
+  fadeSplash(() => {
+    if (destination === "learn") startLearnToPlay({ fromWelcome: true });
+  }, 120);
+}
+
+function fadeSplash(afterHidden, delay = 650) {
   window.setTimeout(() => {
     els.splashScreen.classList.add("leaving");
-  }, 650);
+  }, delay);
   window.setTimeout(() => {
     els.splashScreen.classList.add("hidden");
-  }, 1150);
+    if (typeof afterHidden === "function") afterHidden();
+  }, delay + 500);
 }
 
 function bindEvents() {
   bindUiFeedback();
+  els.welcomeLearnButton?.addEventListener("click", () => completeWelcomeChoice("learn"));
+  els.welcomeSkipButton?.addEventListener("click", () => completeWelcomeChoice("menu"));
   els.dailyWorkoutButton.addEventListener("click", openDailyWorkoutIntro);
   els.practiceDrillsButton.addEventListener("click", () => showHomeMenu("drills"));
   els.timeTrialsButton.addEventListener("click", () => showHomeMenu("trials"));
-  els.learnToPlayButton.addEventListener("click", startLearnToPlay);
+  els.learnToPlayButton.addEventListener("click", () => startLearnToPlay());
   els.startDailyWorkoutButton.addEventListener("click", () => {
     els.dailyWorkoutDialog.close();
     startDailyWorkout();
@@ -479,7 +522,7 @@ function bindUiFeedback() {
 }
 
 function isFeedbackButton(button) {
-  return Boolean(button.closest("#homeView, #dailyWorkoutDialog, #settingsDialog"));
+  return Boolean(button.closest("#splashScreen, #homeView, #dailyWorkoutDialog, #settingsDialog"));
 }
 
 function triggerUiFeedback(kind = "tap") {
@@ -523,12 +566,20 @@ function playUiSound(kind) {
 }
 
 function renderHome() {
+  renderDailyWorkoutCompletion();
   els.mainPracticeGrid.innerHTML = "";
-  TIME_TRIAL_MODES.forEach((trial) => {
+  getTimeTrialMenuOptions().forEach((trial) => {
+    const complete = isCompletedToday(getTimeTrialCompletionKey(trial.mode, trial.seconds));
+    const best = getPersonalBest(trial.mode, trial.seconds);
     const button = document.createElement("button");
-    button.className = "preset-card";
-    button.innerHTML = `<strong>${trial.label}</strong><span>${trial.short}</span>`;
-    button.addEventListener("click", () => startTimeTrial(trial));
+    button.className = `preset-card${complete ? " is-complete" : ""}`;
+    button.innerHTML = `
+      ${renderMenuTitle(trial.menuLabel, complete)}
+      <span>${escapeHtml(trial.menuShort)}</span>
+      ${best ? `<em class="personal-best-badge">PB ${escapeHtml(String(best.score))}</em>` : ""}
+    `;
+    button.setAttribute("aria-label", `${trial.menuLabel}. ${complete ? "Completed today. " : ""}${trial.menuShort}${best ? `. Personal best ${best.score}.` : ""}`);
+    button.addEventListener("click", () => startTimeTrial(trial, trial.seconds));
     els.mainPracticeGrid.append(button);
   });
 
@@ -536,12 +587,158 @@ function renderHome() {
   const visibleOptions = PRACTICE_DRILL_OPTIONS.filter((option) => state.settings.enabledDrills[option.id]);
   const drillOptions = visibleOptions.length ? visibleOptions : PRACTICE_DRILL_OPTIONS;
   drillOptions.forEach((option) => {
+    const complete = isCompletedToday(getPracticeCompletionKey(option));
     const button = document.createElement("button");
-    button.className = "preset-card";
-    button.innerHTML = `<strong>${option.label}</strong><span>${option.short}</span>`;
+    button.className = `preset-card${complete ? " is-complete" : ""}`;
+    button.innerHTML = `${renderMenuTitle(option.label, complete)}<span>${option.short}</span>`;
+    button.setAttribute("aria-label", `${option.label}. ${complete ? "Completed today. " : ""}${option.short}`);
     button.addEventListener("click", () => startDrill(option.id, option));
     els.presetGrid.append(button);
   });
+}
+
+function renderDailyWorkoutCompletion() {
+  const complete = isCompletedToday("daily-workout");
+  els.dailyWorkoutButton.classList.toggle("is-complete", complete);
+  els.dailyWorkoutButton.innerHTML = renderMenuTitle("5-Min Daily Workout", complete);
+  els.dailyWorkoutButton.setAttribute(
+    "aria-label",
+    `5-Min Daily Workout. ${complete ? "Completed today. " : ""}Two random 90-second word drills, then one random 2-minute time trial.`
+  );
+}
+
+function getTimeTrialMenuOptions() {
+  return TIME_TRIAL_MODES.flatMap((trial) => TIME_TRIAL_DURATIONS.map((seconds) => ({
+    ...trial,
+    seconds,
+    menuLabel: `${trial.label} (${formatDurationLabel(seconds)})`,
+    menuShort: `${formatDurationLabel(seconds)}. ${trial.short}`
+  })));
+}
+
+function renderMenuTitle(label, complete) {
+  return `<strong>${escapeHtml(label)}${complete ? ' <span class="completion-mark" aria-hidden="true">&#9989;</span>' : ""}</strong>`;
+}
+
+function getTodayKey() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function getCompletedTodayState() {
+  const today = getTodayKey();
+  const completed = state.stats.completedToday;
+  if (completed?.date === today && Array.isArray(completed.items)) return completed;
+  state.stats.completedToday = { date: today, items: [] };
+  return state.stats.completedToday;
+}
+
+function isCompletedToday(key) {
+  return getCompletedTodayState().items.includes(key);
+}
+
+function markCompletedToday(key) {
+  if (!key) return;
+  const completed = getCompletedTodayState();
+  if (!completed.items.includes(key)) completed.items.push(key);
+}
+
+function getPracticeCompletionKey(option) {
+  if (option.id === "flash") return `drill:flash:${option.wordMode || "mixed"}`;
+  if (option.id === "trouble") return `drill:trouble:${option.troubleLetter || "mixed"}`;
+  return `drill:${option.id}`;
+}
+
+function getTimeTrialCompletionKey(mode, seconds = TIME_TRIAL_SECONDS) {
+  return `trial:${mode || "letters"}:${seconds || TIME_TRIAL_SECONDS}`;
+}
+
+function getSessionCompletionKey(session, nextWorkoutStep) {
+  if (session.mode === "daily") return nextWorkoutStep === null ? "daily-workout" : null;
+  if (session.mode === "main") return getTimeTrialCompletionKey(session.timeTrialMode, session.timeLimitSeconds);
+  if (session.mode !== "drill") return null;
+  if (session.drillId === "flash") return `drill:flash:${session.wordMode || session.flashMode || "mixed"}`;
+  if (session.drillId === "trouble") return `drill:trouble:${session.troubleLetter || "mixed"}`;
+  return `drill:${session.drillId}`;
+}
+
+function formatDurationLabel(seconds) {
+  const minutes = Math.round((seconds || TIME_TRIAL_SECONDS) / 60);
+  return `${minutes} min`;
+}
+
+function getTimeTrialBestKey(mode, seconds = TIME_TRIAL_SECONDS) {
+  return `${mode || "letters"}:${seconds || TIME_TRIAL_SECONDS}`;
+}
+
+function getPersonalBest(mode, seconds = TIME_TRIAL_SECONDS) {
+  return state.stats.personalBests?.[getTimeTrialBestKey(mode, seconds)] || null;
+}
+
+function recordPersonalBest(session) {
+  if (!session.timeTrialResult) return null;
+  const key = getTimeTrialBestKey(session.timeTrialMode, session.timeLimitSeconds);
+  const current = makePersonalBestRecord(session, key);
+  state.stats.personalBests = state.stats.personalBests || {};
+  const previous = state.stats.personalBests[key] || null;
+  const isNew = !previous || current.score > previous.score;
+  if (isNew) state.stats.personalBests[key] = current;
+  session.personalBest = {
+    key,
+    current,
+    previous,
+    best: isNew ? current : previous,
+    isNew
+  };
+  if (isNew && hasLeaderboardBackend()) {
+    session.leaderboardSubmitPromise = submitLeaderboardScore(session)
+      .then(() => true)
+      .catch(() => false);
+  }
+  return session.personalBest;
+}
+
+function makePersonalBestRecord(session, key) {
+  const result = session.timeTrialResult || {};
+  return {
+    key,
+    mode: result.mode || session.timeTrialMode || "letters",
+    durationSeconds: session.timeLimitSeconds || TIME_TRIAL_SECONDS,
+    label: session.timeTrialLabel || result.label || "Time Trial",
+    score: result.score || 0,
+    words: result.words || 0,
+    letters: result.letters || 0,
+    invalid: result.invalid || 0,
+    scrabble: result.scrabble || 0,
+    hooks: result.hooks || 0,
+    crosses: result.crosses || 0,
+    playerName: getPlayerName(),
+    playedAt: new Date().toISOString()
+  };
+}
+
+function getPlayerName() {
+  const custom = sanitizePlayerName(state.settings.playerName);
+  if (custom) return custom;
+  if (!state.stats.playerTag) {
+    state.stats.playerTag = `Player ${Math.floor(1000 + Math.random() * 9000)}`;
+  }
+  return state.stats.playerTag;
+}
+
+function sanitizePlayerName(name) {
+  return String(name || "")
+    .replace(/[^\w .'-]/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 18);
+}
+
+function hasLeaderboardBackend() {
+  return Boolean(LEADERBOARD_CONFIG.supabaseUrl && LEADERBOARD_CONFIG.supabaseAnonKey);
 }
 
 function openDailyWorkoutIntro() {
@@ -567,6 +764,8 @@ function showHomeMenu(menu) {
 
 function renderSettings() {
   els.difficultySelect.value = state.settings.difficulty;
+  els.playerNameInput.value = state.settings.playerName || "";
+  els.playerNameInput.placeholder = state.stats.playerTag || "Player 1234";
   els.adaptiveToggle.checked = state.settings.adaptive;
   els.drillSettings.innerHTML = "";
   DRILL_ORDER.forEach((id) => {
@@ -595,6 +794,7 @@ function saveSettingsFromDialog() {
   });
   state.settings = {
     difficulty: els.difficultySelect.value,
+    playerName: sanitizePlayerName(els.playerNameInput.value),
     adaptive: els.adaptiveToggle.checked,
     enabledDrills
   };
@@ -602,22 +802,24 @@ function saveSettingsFromDialog() {
   renderHome();
 }
 
-function buildTimeTrialStep(trial, seconds = TIME_TRIAL_SECONDS) {
+function buildTimeTrialStep(trial, seconds = trial.seconds || TIME_TRIAL_SECONDS) {
+  const duration = formatDurationLabel(seconds);
   const step = {
     id: trial.id,
     seconds,
-    short: trial.short,
-    dailyKey: `trial-${trial.mode}`,
-    practiceTitle: trial.practiceTitle,
+    short: `${duration}. ${trial.short}`,
+    dailyKey: `trial-${trial.mode}-${seconds}`,
+    practiceTitle: `${trial.practiceTitle || trial.label} (${duration})`,
     timeTrialMode: trial.mode,
     timeTrialLabel: trial.label,
-    timeTrialPrompt: trial.prompt
+    timeTrialPrompt: trial.prompt,
+    timeTrialDurationLabel: duration
   };
   if (trial.id === "peel") step.fixedLetters = shuffle(randomItem(TIME_TRIAL_STARTER_RACKS));
   return step;
 }
 
-function startTimeTrial(trial, seconds = TIME_TRIAL_SECONDS) {
+function startTimeTrial(trial, seconds = trial.seconds || TIME_TRIAL_SECONDS) {
   const step = buildTimeTrialStep(trial, seconds);
   state.workout = null;
   state.pendingWorkoutStep = null;
@@ -629,6 +831,7 @@ function startTimeTrial(trial, seconds = TIME_TRIAL_SECONDS) {
     timeTrialMode: step.timeTrialMode,
     timeTrialLabel: step.timeTrialLabel,
     timeTrialPrompt: step.timeTrialPrompt,
+    timeTrialDurationLabel: step.timeTrialDurationLabel,
     timerId: null,
     tilesDrawn: step.id === "peel" ? (step.fixedLetters?.length || 12) : 0
   });
@@ -687,6 +890,7 @@ function startWorkoutStep(index) {
     timeTrialMode: step.timeTrialMode || null,
     timeTrialLabel: step.timeTrialLabel || null,
     timeTrialPrompt: step.timeTrialPrompt || null,
+    timeTrialDurationLabel: step.timeTrialDurationLabel || null,
     timerId: null,
     tilesDrawn: step.id === "peel" ? (step.fixedLetters?.length || 12) : 0
   });
@@ -712,9 +916,13 @@ function startDrill(id, options = {}) {
   showView("session");
 }
 
-function startLearnToPlay() {
+function startLearnToPlay(options = {}) {
   state.workout = null;
   state.pendingWorkoutStep = null;
+  if (!state.stats.learnGateEntered || options.gated) {
+    state.stats.learnGateEntered = true;
+    saveAll();
+  }
   state.session = createSession("learn", {
     mode: "learn",
     learnStep: 0,
@@ -765,6 +973,7 @@ function loadDrill(id) {
   window.scrollTo({ top: 0, behavior: "smooth" });
 
   if (id === "flash") renderFlash();
+  if (id === "unscramble") renderUnscramble();
   if (id === "glue") renderGlue();
   if (id === "trouble") renderTrouble();
   if (id === "flex") renderFlex();
@@ -800,6 +1009,7 @@ function completeRound() {
     return;
   }
   if (state.session.timerId) window.clearInterval(state.session.timerId);
+  if (state.session.unscrambleNextTimer) window.clearTimeout(state.session.unscrambleNextTimer);
   if (state.session.drillId === "flash" && !state.session.flashMissed) scoreTileFlash();
   if (state.session.drillId === "trouble" && !state.session.troubleScored) scoreTroubleTile();
   if (state.session.drillId === "flex") state.session.flexScore = calculateFlexScore();
@@ -810,14 +1020,16 @@ function completeRound() {
   if (["main", "daily"].includes(state.session.mode) && state.session.timeTrialMode) {
     state.session.timeTrialResult = calculateTimeTrialResult(state.session);
     state.session.words = state.session.timeTrialResult.words || state.session.words;
+    recordPersonalBest(state.session);
   }
+  const nextWorkoutStep = getNextWorkoutStep(state.session);
+  markCompletedToday(getSessionCompletionKey(state.session, nextWorkoutStep));
   state.stats.sessions = (state.stats.sessions || 0) + 1;
   state.stats.words = (state.stats.words || 0) + state.session.words;
   state.stats.dumps = (state.stats.dumps || 0) + state.session.dumps;
   state.stats.peels = (state.stats.peels || 0) + state.session.peels;
   state.stats.lettersPlaced = (state.stats.lettersPlaced || 0) + state.session.lettersPlaced;
   saveAll();
-  const nextWorkoutStep = getNextWorkoutStep(state.session);
   if (state.session.mode === "daily") recordWorkoutResult(state.session);
   state.pendingWorkoutStep = nextWorkoutStep;
   renderSummary();
@@ -856,6 +1068,13 @@ function makeWorkoutResult(session) {
       title,
       score: formatPercent(session.troubleFoundCount || 0, session.troublePossibleCount || 0),
       detail: `${session.troubleFoundCount || 0} found, ${missed} missed using ${session.troubleLetter || "-"}`
+    };
+  }
+  if (session.drillId === "unscramble") {
+    return {
+      title,
+      score: session.unscrambleScore || 0,
+      detail: `${session.unscrambleRounds?.length || 0} solved racks, ${session.unscrambleInvalidCount || 0} misses`
     };
   }
   if (session.drillId === "glue") {
@@ -966,6 +1185,13 @@ function renderSummary() {
           ["Missed", troubleMissedCount],
           ["Trouble", current.troubleLetter || "-"]
         ]
+    : current?.drillId === "unscramble"
+      ? [
+          ["Score", current.unscrambleScore || 0],
+          ["Racks", current.unscrambleRounds?.length || 0],
+          ["Big", current.unscrambleBigFoundCount || 0],
+          ["Small", current.unscrambleSmallFoundCount || 0]
+        ]
     : [
         ["Words", current?.words || 0],
         ["Take 1", current?.peels || 0],
@@ -973,10 +1199,12 @@ function renderSummary() {
         ["Misses", current?.misses || 0]
       ];
   els.metricGrid.innerHTML = metrics.map(([label, value]) => `<div class="metric"><strong>${value}</strong><span>${label}</span></div>`).join("");
-  if (current?.drillId === "flex") renderFlexSummaryDetails(current);
-  if (current?.drillId === "flash") renderFlashSummaryDetails(current);
-  if (current?.drillId === "trouble") renderTroubleSummaryDetails(current);
   if (isFinalDailySummary) renderWorkoutSummaryDetails();
+  else if (isTimeTrialSession(current)) renderTimeTrialSummaryDetails(current);
+  else if (current?.drillId === "flex") renderFlexSummaryDetails(current);
+  else if (current?.drillId === "flash") renderFlashSummaryDetails(current);
+  else if (current?.drillId === "unscramble") renderUnscrambleSummaryDetails(current);
+  else if (current?.drillId === "trouble") renderTroubleSummaryDetails(current);
 
   if (current?.mode === "daily") {
     els.playAgainButton.textContent = state.pendingWorkoutStep !== null ? "Next Exercise" : "Repeat 5-Min Workout";
@@ -1002,6 +1230,128 @@ function renderWorkoutSummaryDetails() {
   `;
 }
 
+function isTimeTrialSession(session) {
+  return Boolean(session?.timeTrialResult && session.timeTrialMode && session.timeLimitSeconds);
+}
+
+function renderTimeTrialSummaryDetails(session) {
+  const bestInfo = session.personalBest || {
+    best: getPersonalBest(session.timeTrialMode, session.timeLimitSeconds),
+    isNew: false
+  };
+  const best = bestInfo.best || bestInfo.current;
+  const previous = bestInfo.previous;
+  const bestLabel = bestInfo.isNew ? "New Personal Best" : "Personal Best";
+  const detail = getTimeTrialDetail(session);
+  const previousCopy = previous ? `Previous best: ${previous.score}.` : "First saved score for this mode.";
+  els.summaryDetails.innerHTML = `
+    <div class="summary-score-card personal-best-card">
+      <span>${bestLabel}</span>
+      <strong>${escapeHtml(String(best?.score ?? session.timeTrialResult.score ?? 0))}</strong>
+      <em>${escapeHtml(`${formatDurationLabel(session.timeLimitSeconds)} ${session.timeTrialLabel || "Time Trial"}`)}</em>
+      <p>${escapeHtml(bestInfo.isNew ? previousCopy : `${detail}. Score to beat: ${best?.score ?? 0}.`)}</p>
+    </div>
+    <div class="leaderboard-card">
+      <div>
+        <strong>Global High Scores</strong>
+        <span>${escapeHtml(`${formatDurationLabel(session.timeLimitSeconds)} ${session.timeTrialLabel || "Time Trial"}`)}</span>
+      </div>
+      <ol id="leaderboardRows" class="leaderboard-rows">
+        <li><span>1</span><strong>${escapeHtml(best?.playerName || getPlayerName())}</strong><em>${escapeHtml(String(best?.score ?? session.timeTrialResult.score ?? 0))}</em></li>
+      </ol>
+      <p id="leaderboardStatus">${hasLeaderboardBackend() ? "Loading global high scores..." : "Personal bests are live. Add Supabase config to turn on global scores."}</p>
+    </div>
+  `;
+  if (hasLeaderboardBackend()) syncLeaderboardPanel(session);
+}
+
+async function syncLeaderboardPanel(session) {
+  const status = document.querySelector("#leaderboardStatus");
+  const rows = document.querySelector("#leaderboardRows");
+  if (!status || !rows) return;
+
+  try {
+    if (session.personalBest?.isNew) {
+      status.textContent = "Submitting new personal best...";
+      const submitted = await (session.leaderboardSubmitPromise || submitLeaderboardScore(session).then(() => true));
+      if (!submitted) throw new Error("Leaderboard submit failed");
+    }
+    status.textContent = "Loading global high scores...";
+    const scores = await fetchLeaderboardScores(session.timeTrialMode, session.timeLimitSeconds);
+    rows.innerHTML = scores.length
+      ? scores.map((score, index) => renderLeaderboardRow(score, index)).join("")
+      : `<li><span>1</span><strong>${escapeHtml(getPlayerName())}</strong><em>${escapeHtml(String(session.timeTrialResult.score || 0))}</em></li>`;
+    status.textContent = scores.length ? "Global board loaded." : "No global scores yet. Your score is ready to lead it.";
+  } catch {
+    status.textContent = "Global board could not be reached. Personal best is saved locally.";
+  }
+}
+
+function renderLeaderboardRow(score, index) {
+  return `
+    <li>
+      <span>${index + 1}</span>
+      <strong>${escapeHtml(score.player_name || score.playerName || "Player")}</strong>
+      <em>${escapeHtml(String(score.score || 0))}</em>
+    </li>
+  `;
+}
+
+async function submitLeaderboardScore(session) {
+  const payload = buildLeaderboardPayload(session);
+  const response = await fetch(getLeaderboardUrl(), {
+    method: "POST",
+    headers: getLeaderboardHeaders({ Prefer: "return=minimal" }),
+    body: JSON.stringify(payload)
+  });
+  if (!response.ok) throw new Error("Leaderboard submit failed");
+}
+
+async function fetchLeaderboardScores(mode, seconds) {
+  const params = [
+    "select=player_name,score,words,letters,invalid,created_at",
+    `mode=eq.${encodeURIComponent(mode || "letters")}`,
+    `duration_seconds=eq.${encodeURIComponent(seconds || TIME_TRIAL_SECONDS)}`,
+    "order=score.desc,created_at.asc",
+    `limit=${LEADERBOARD_LIMIT}`
+  ].join("&");
+  const response = await fetch(`${getLeaderboardUrl()}?${params}`, {
+    headers: getLeaderboardHeaders()
+  });
+  if (!response.ok) throw new Error("Leaderboard fetch failed");
+  return response.json();
+}
+
+function buildLeaderboardPayload(session) {
+  const result = session.timeTrialResult || {};
+  return {
+    player_name: getPlayerName(),
+    mode: session.timeTrialMode || result.mode || "letters",
+    duration_seconds: session.timeLimitSeconds || TIME_TRIAL_SECONDS,
+    score: result.score || 0,
+    words: result.words || 0,
+    letters: result.letters || 0,
+    invalid: result.invalid || 0,
+    detail: getTimeTrialDetail(session),
+    created_at: new Date().toISOString()
+  };
+}
+
+function getLeaderboardUrl() {
+  const base = String(LEADERBOARD_CONFIG.supabaseUrl || "").replace(/\/$/, "");
+  return `${base}/rest/v1/${encodeURIComponent(LEADERBOARD_CONFIG.table || LEADERBOARD_TABLE)}`;
+}
+
+function getLeaderboardHeaders(extra = {}) {
+  const key = LEADERBOARD_CONFIG.supabaseAnonKey;
+  return {
+    apikey: key,
+    Authorization: `Bearer ${key}`,
+    "Content-Type": "application/json",
+    ...extra
+  };
+}
+
 function summaryLine() {
   if (!state.session) return "Good work. Your practice history is saved on this device.";
   if (state.session.mode === "daily") return state.pendingWorkoutStep !== null ? "Exercise complete. Keep the workout moving when you are ready." : "Daily workout complete. Nice balanced practice.";
@@ -1009,6 +1359,7 @@ function summaryLine() {
   if (state.session.drillId === "flex") return "Board score rewards hooks that keep the grid open and crosses that make tiles work twice.";
   if (state.session.drillId === "glue") return state.session.glueSolved ? "All word islands are connected." : "Glue Words ends when every word island becomes one connected valid board.";
   if (state.session.drillId === "flash") return "Review what you found and what you missed.";
+  if (state.session.drillId === "unscramble") return "Big-word recognition builds the habit of spotting an anchor before the rack gets noisy.";
   if (state.session.drillId === "trouble") return `Review what you found and missed using ${state.session.troubleLetter || "the trouble tile"}.`;
   if (state.session.dumps > state.session.peels) return "A lot of tiles got traded in today. Next session will keep an eye on trouble tiles.";
   if (state.session.peels > 1) return "Nice Take 1 tempo. The grid work is starting to behave.";
@@ -1107,6 +1458,70 @@ function getWordScore(word) {
 function formatPercent(found, possible) {
   if (!possible) return "0%";
   return `${Math.round((found / possible) * 100)}%`;
+}
+
+function makeUnscrambleSetup() {
+  const data = getWordLengthData();
+  let best = null;
+
+  for (let attempt = 0; attempt < 180; attempt++) {
+    const bigLength = randomItem(UNSCRAMBLE_BIG_LENGTHS);
+    const smallLength = UNSCRAMBLE_RACK_SIZE - bigLength;
+    const bigWord = randomItem(data.byLength.get(bigLength) || []);
+    const smallWord = randomItem(data.byLength.get(smallLength) || []);
+    if (!bigWord || !smallWord) continue;
+
+    const letters = shuffle([...bigWord, ...smallWord]);
+    const bigAnswers = getPossibleWordsForLength(letters, bigLength, data);
+    const smallAnswers = getPossibleWordsForLength(letters, smallLength, data);
+    if (!bigAnswers.length || !smallAnswers.length) continue;
+
+    const score = scoreUnscrambleRack(bigAnswers.length, smallAnswers.length, smallLength);
+    const setup = { letters, bigLength, smallLength, bigAnswers, smallAnswers, score };
+    if (!best || score < best.score) best = setup;
+    if (score === 0) return setup;
+  }
+
+  if (best) return best;
+
+  const fallbackBig = "BANANA";
+  const fallbackSmall = "GAME";
+  const letters = shuffle([...fallbackBig, ...fallbackSmall]);
+  return {
+    letters,
+    bigLength: 6,
+    smallLength: 4,
+    bigAnswers: getPossibleWordsForLength(letters, 6, data),
+    smallAnswers: getPossibleWordsForLength(letters, 4, data),
+    score: 99
+  };
+}
+
+function scoreUnscrambleRack(bigCount, smallCount, smallLength) {
+  const targetSmall = smallLength === 2 ? 6 : smallLength === 3 ? 10 : 14;
+  const bigPenalty = bigCount >= 1 && bigCount <= 10 ? 0 : Math.min(Math.abs(bigCount - 5), 8);
+  const smallPenalty = smallCount >= 2 && smallCount <= targetSmall ? 0 : Math.abs(smallCount - targetSmall);
+  return bigPenalty + smallPenalty;
+}
+
+function getPossibleWordsForLength(letters, length, data = getWordLengthData()) {
+  return (data.byLength.get(length) || [])
+    .filter((word) => canBuildWord(word, letters))
+    .sort((a, b) => a.localeCompare(b));
+}
+
+function getWordLengthData() {
+  const cacheKey = `${state.dictionary?.source || "starter"}:${state.dictionary?.count || WORD_SET.size}:${WORD_SET.size}`;
+  if (wordLengthDataCache?.key === cacheKey) return wordLengthDataCache.data;
+  const byLength = new Map();
+  [...WORD_SET]
+    .filter((word) => /^[A-Z]+$/.test(word))
+    .forEach((word) => {
+      if (!byLength.has(word.length)) byLength.set(word.length, []);
+      byLength.get(word.length).push(word);
+    });
+  wordLengthDataCache = { key: cacheKey, data: { byLength } };
+  return wordLengthDataCache.data;
 }
 
 function makeWordFindingSetup(mode) {
@@ -1224,6 +1639,213 @@ function renderFlash() {
   });
   document.querySelector("#finishFlash").addEventListener("click", finishTileFlash);
   renderFlashAttempts();
+}
+
+function renderUnscramble() {
+  state.session.unscrambleScore = state.session.unscrambleScore || 0;
+  state.session.unscrambleRounds = state.session.unscrambleRounds || [];
+  state.session.unscrambleBigFoundCount = state.session.unscrambleBigFoundCount || 0;
+  state.session.unscrambleSmallFoundCount = state.session.unscrambleSmallFoundCount || 0;
+  state.session.unscrambleInvalidCount = state.session.unscrambleInvalidCount || 0;
+  els.drillPrompt.textContent = "Find both target words from the same 10 tiles. The two word lengths always add to 10.";
+  state.board = Array.from({ length: BOARD_SIZE * BOARD_SIZE }, () => null);
+  state.tray = [];
+  dealUnscrambleRound();
+}
+
+function dealUnscrambleRound() {
+  if (!state.session || state.session.drillId !== "unscramble") return;
+  const setup = makeUnscrambleSetup();
+  state.session.unscrambleRoundNumber = (state.session.unscrambleRoundNumber || 0) + 1;
+  state.session.unscrambleCurrent = {
+    ...setup,
+    bigFound: "",
+    smallFound: "",
+    attempts: [],
+    solved: false
+  };
+  renderUnscrambleRound();
+}
+
+function renderUnscrambleRound() {
+  const round = state.session.unscrambleCurrent;
+  if (!round) return;
+  els.drillSurface.innerHTML = `
+    <div class="flash-panel unscramble-panel">
+      <div class="unscramble-status" id="unscrambleStatus">Rack ${state.session.unscrambleRoundNumber || 1} · ${round.bigLength} + ${round.smallLength}</div>
+      <div class="unscramble-targets">
+        <div class="unscramble-target" data-target="big">
+          <strong>${round.bigLength}-letter word</strong>
+          <span id="unscrambleBigTarget">Not found yet</span>
+        </div>
+        <div class="unscramble-target" data-target="small">
+          <strong>${round.smallLength}-letter word</strong>
+          <span id="unscrambleSmallTarget">Not found yet</span>
+        </div>
+      </div>
+      <div class="attempt-log">
+        <div class="attempt-list">
+          <strong>&#127820; Found</strong>
+          <div id="validAttempts"></div>
+        </div>
+        <div class="attempt-list">
+          <strong>&#10060; Try Again</strong>
+          <div id="invalidAttempts"></div>
+        </div>
+      </div>
+      ${renderLetterRows(round.letters)}
+      <div class="word-entry">
+        <input id="wordInput" maxlength="32" placeholder="Enter a ${round.bigLength}- or ${round.smallLength}-letter word">
+        <button id="submitWord">Submit</button>
+      </div>
+      <p id="wordFeedback"></p>
+    </div>
+  `;
+  els.sessionActions.innerHTML = `<button id="finishUnscramble" class="primary">Done</button>`;
+  bindUnscrambleInput();
+  document.querySelector("#finishUnscramble").addEventListener("click", finishUnscrambleDrill);
+  renderUnscrambleProgress();
+}
+
+function bindUnscrambleInput() {
+  const input = document.querySelector("#wordInput");
+  const submit = document.querySelector("#submitWord");
+  const feedback = document.querySelector("#wordFeedback");
+  const trySubmit = () => {
+    const round = state.session?.unscrambleCurrent;
+    const word = input.value.trim().toUpperCase();
+    if (!round || !word || round.solved) return;
+
+    if (!canBuildWord(word, round.letters)) {
+      rejectUnscrambleWord(word, "Those letters are not all available.");
+      input.value = "";
+      return;
+    }
+
+    if (!WORD_SET.has(word)) {
+      rejectUnscrambleWord(word, `${word} is not in the active dictionary.`);
+      addMiss(word);
+      input.value = "";
+      return;
+    }
+
+    if (word.length === round.bigLength) {
+      acceptUnscrambleWord("big", word);
+      input.value = "";
+      return;
+    }
+
+    if (word.length === round.smallLength) {
+      acceptUnscrambleWord("small", word);
+      input.value = "";
+      return;
+    }
+
+    rejectUnscrambleWord(word, `${word} is valid, but this rack needs ${round.bigLength}- and ${round.smallLength}-letter words.`);
+    input.value = "";
+  };
+  submit.addEventListener("click", trySubmit);
+  input.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") trySubmit();
+  });
+  bindLetterRowToInput(input);
+  input.focus();
+  feedback.textContent = `Find a ${state.session.unscrambleCurrent.bigLength}-letter word and a ${state.session.unscrambleCurrent.smallLength}-letter word.`;
+}
+
+function acceptUnscrambleWord(kind, word) {
+  const round = state.session.unscrambleCurrent;
+  const feedback = document.querySelector("#wordFeedback");
+  if (kind === "big" && round.bigFound) {
+    feedback.textContent = `Already found the big word: ${round.bigFound}.`;
+    return;
+  }
+  if (kind === "small" && round.smallFound) {
+    feedback.textContent = `Already found the smaller word: ${round.smallFound}.`;
+    return;
+  }
+
+  if (kind === "big") {
+    round.bigFound = word;
+    state.session.unscrambleBigFoundCount += 1;
+  } else {
+    round.smallFound = word;
+    state.session.unscrambleSmallFoundCount += 1;
+  }
+  round.attempts.push({ word, valid: true });
+  state.session.unscrambleScore += 1;
+  state.session.words = state.session.unscrambleScore;
+  feedback.textContent = `${word} found.`;
+  renderUnscrambleProgress();
+  if (round.bigFound && round.smallFound) finishUnscrambleRound();
+}
+
+function rejectUnscrambleWord(word, message) {
+  state.session.misses += 1;
+  state.session.unscrambleInvalidCount += 1;
+  state.session.unscrambleCurrent.attempts.push({ word, valid: false });
+  document.querySelector("#wordFeedback").textContent = message;
+  renderUnscrambleProgress();
+}
+
+function renderUnscrambleProgress() {
+  const round = state.session?.unscrambleCurrent;
+  if (!round) return;
+  const bigTarget = document.querySelector("#unscrambleBigTarget");
+  const smallTarget = document.querySelector("#unscrambleSmallTarget");
+  const status = document.querySelector("#unscrambleStatus");
+  if (bigTarget) bigTarget.textContent = round.bigFound || "Not found yet";
+  if (smallTarget) smallTarget.textContent = round.smallFound || "Not found yet";
+  document.querySelectorAll(".unscramble-target").forEach((target) => {
+    const solved = target.dataset.target === "big" ? round.bigFound : round.smallFound;
+    target.classList.toggle("solved", Boolean(solved));
+  });
+  if (status) {
+    status.textContent = round.solved
+      ? "Nice. Loading the next rack..."
+      : `Rack ${state.session.unscrambleRoundNumber || 1} · ${round.bigLength} + ${round.smallLength} · Score ${state.session.unscrambleScore || 0}`;
+  }
+  renderUnscrambleAttempts();
+}
+
+function renderUnscrambleAttempts() {
+  const valid = document.querySelector("#validAttempts");
+  const invalid = document.querySelector("#invalidAttempts");
+  const attempts = state.session?.unscrambleCurrent?.attempts || [];
+  if (!valid || !invalid) return;
+  valid.innerHTML = attempts.filter((attempt) => attempt.valid).map(wordPill).join("");
+  invalid.innerHTML = attempts.filter((attempt) => !attempt.valid).map((attempt) => wordPill(attempt, true)).join("");
+}
+
+function finishUnscrambleRound() {
+  const round = state.session.unscrambleCurrent;
+  if (!round || round.solved) return;
+  round.solved = true;
+  state.session.unscrambleRounds.push({
+    bigLength: round.bigLength,
+    smallLength: round.smallLength,
+    bigFound: round.bigFound,
+    smallFound: round.smallFound,
+    letters: round.letters
+  });
+  state.session.completedDrills = state.session.unscrambleRounds.length;
+  renderUnscrambleProgress();
+  const input = document.querySelector("#wordInput");
+  const submit = document.querySelector("#submitWord");
+  if (input) input.disabled = true;
+  if (submit) submit.disabled = true;
+  state.session.unscrambleNextTimer = window.setTimeout(() => {
+    if (!state.session || state.session.drillId !== "unscramble") return;
+    state.session.unscrambleNextTimer = null;
+    dealUnscrambleRound();
+  }, 850);
+}
+
+function finishUnscrambleDrill() {
+  if (!state.session || state.session.drillId !== "unscramble") return;
+  if (state.session.unscrambleNextTimer) window.clearTimeout(state.session.unscrambleNextTimer);
+  state.session.unscrambleNextTimer = null;
+  completeRound();
 }
 
 function renderGlue() {
@@ -1648,6 +2270,8 @@ function goToNextLearnStep() {
 
 function finishLearnToPlay() {
   clearLearnHighlights();
+  state.stats.learnCompleted = true;
+  saveAll();
   state.session = null;
   showView("home");
   showHomeMenu("home");
@@ -1953,6 +2577,36 @@ function renderFlashSummaryDetails(session) {
     <div class="summary-list">
       <strong>Missed Words</strong>
       <div>${renderWordPills(missed, "None")}</div>
+    </div>
+  `;
+}
+
+function renderUnscrambleSummaryDetails(session) {
+  const rounds = session.unscrambleRounds || [];
+  const current = session.unscrambleCurrent || null;
+  const includeCurrent = current && !current.solved;
+  const bigFound = [
+    ...rounds.map((round) => round.bigFound).filter(Boolean),
+    includeCurrent ? current.bigFound : ""
+  ].filter(Boolean);
+  const smallFound = [
+    ...rounds.map((round) => round.smallFound).filter(Boolean),
+    includeCurrent ? current.smallFound : ""
+  ].filter(Boolean);
+  const missedBig = !includeCurrent || current.bigFound ? [] : (current.bigAnswers || []).slice(0, 16);
+  const missedSmall = !includeCurrent || current.smallFound ? [] : (current.smallAnswers || []).slice(0, 16);
+  els.summaryDetails.innerHTML = `
+    <div class="summary-list">
+      <strong>Big Words Found</strong>
+      <div>${renderWordPills(bigFound, "None yet")}</div>
+    </div>
+    <div class="summary-list">
+      <strong>Smaller Words Found</strong>
+      <div>${renderWordPills(smallFound, "None yet")}</div>
+    </div>
+    <div class="summary-list">
+      <strong>Current Rack Misses</strong>
+      <div>${renderWordPills([...missedBig, ...missedSmall], "None")}</div>
     </div>
   `;
 }
@@ -2574,6 +3228,7 @@ function importDictionaryFile(event) {
     const words = mergeApprovedWords(importedWords);
     WORD_SET = new Set(words);
     glueWordDataCache = null;
+    wordLengthDataCache = null;
     state.dictionary = {
       name: `${file.name} + built-in`,
       count: words.length,
@@ -2625,6 +3280,7 @@ function resetDictionary() {
   dictionaryState = starterDictionaryState();
   WORD_SET = new Set(dictionaryState.words);
   glueWordDataCache = null;
+  wordLengthDataCache = null;
   state.dictionary = dictionaryState.meta;
   renderDictionaryStatus();
   if (els.board.children.length) renderTiles();
