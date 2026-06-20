@@ -4,8 +4,16 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="theme-color" content="#ffd43b">
+    <meta name="application-name" content="Banana Gym">
+    <meta name="apple-mobile-web-app-title" content="Banana Gym">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="msapplication-TileColor" content="#ffd43b">
     <title>Brooke's Bananagram Gym</title>
-    <link rel="stylesheet" href="styles.css">
+    <link rel="icon" type="image/svg+xml" href="favicon.svg?v=20260620">
+    <link rel="apple-touch-icon" href="favicon.svg?v=20260620">
+    <link rel="manifest" href="site.webmanifest?v=20260620">
+    <link rel="stylesheet" href="styles.css?v=20260620-board2">
   </head>
   <body>
     <div class="splash-screen" id="splashScreen">
@@ -43,9 +51,9 @@
               <button class="lane-button recommended" id="dailyWorkoutButton" type="button" aria-label="5-Min Daily Workout. Two random 90-second word drills, then one random 2-minute time trial.">
                 <strong>5-Min Daily Workout</strong>
               </button>
-              <button class="lane-button" id="practiceDrillsButton" type="button" aria-label="Practice Drills. Work one Bananagrams skill at a time without a countdown.">
+              <button class="lane-button" id="practiceDrillsButton" type="button" aria-label="Practice Drills. Work one Bananagrams skill at a time, relaxed or timed.">
                 <strong>Practice Drills</strong>
-                <span class="lane-subtitle">Work one Bananagrams skill at a time without a countdown.</span>
+                <span class="lane-subtitle">Work one Bananagrams skill at a time, relaxed or timed.</span>
               </button>
               <button class="lane-button" id="timeTrialsButton" type="button" aria-label="Time Trials. See how many letters you can play in valid words before time runs out.">
                 <strong>Time Trials</strong>
@@ -66,7 +74,11 @@
             <div class="section-heading menu-heading">
               <div>
                 <h2>Practice Drills</h2>
-                <p class="lane-copy">Work one Bananagrams skill at a time without a countdown.</p>
+                <p class="lane-copy">Work one Bananagrams skill at a time, relaxed or timed.</p>
+                <div class="practice-mode-toggle" role="group" aria-label="Practice timing">
+                  <button class="is-active" type="button" data-practice-mode="untimed" aria-pressed="true">Untimed</button>
+                  <button type="button" data-practice-mode="90" aria-pressed="false">90 Sec</button>
+                </div>
               </div>
             </div>
             <div class="preset-grid drill-grid" id="presetGrid"></div>
@@ -91,11 +103,14 @@
               <strong id="currentDrillName">Tile Rush</strong>
               <p class="session-explainer" id="sessionExplainer"></p>
               <span id="sessionMeta"></span>
+              <div class="session-score-strip" id="sessionScoreStrip" hidden></div>
             </div>
           </div>
 
           <div class="board-wrap" id="boardWrap">
-            <div class="board" id="board" aria-label="Practice grid"></div>
+            <div class="board-viewport">
+              <div class="board" id="board" aria-label="Practice grid"></div>
+            </div>
             <div class="tray" id="tray" aria-label="Tile tray"></div>
             <div class="board-toolbar">
               <button id="undoButton">Undo</button>
@@ -170,12 +185,30 @@
 
         <label class="field">
           <span>Arcade name</span>
-          <input id="playerNameInput" maxlength="18" placeholder="Player 1234" autocomplete="nickname">
+          <input id="playerNameInput" maxlength="10" placeholder="JAC" autocomplete="nickname" autocapitalize="characters">
+        </label>
+
+        <label class="field">
+          <span>Arcade emoji</span>
+          <select id="playerEmojiSelect">
+            <option value="&#127820;">&#127820;</option>
+            <option value="&#127942;">&#127942;</option>
+            <option value="&#11088;">&#11088;</option>
+            <option value="&#128293;">&#128293;</option>
+            <option value="&#129504;">&#129504;</option>
+            <option value="&#128170;">&#128170;</option>
+            <option value="&#127775;">&#127775;</option>
+          </select>
         </label>
 
         <label class="toggle-row">
           <span>Adaptive focus</span>
           <input type="checkbox" id="adaptiveToggle">
+        </label>
+
+        <label class="toggle-row">
+          <span>Global high scores</span>
+          <input type="checkbox" id="globalScoresToggle">
         </label>
 
         <div>
@@ -200,7 +233,46 @@
       </form>
     </dialog>
 
-    <script src="scrabble-word-list.js"></script>
-    <script src="app.js"></script>
+    <dialog id="arcadeProfileDialog">
+      <div class="arcade-profile">
+        <div class="dialog-head">
+          <div>
+            <h2>Arcade Profile</h2>
+            <p class="dialog-copy">Choose the short name that appears with your high scores and future global boards.</p>
+          </div>
+        </div>
+
+        <label class="field">
+          <span>Handle</span>
+          <input id="arcadeHandleInput" maxlength="10" placeholder="JAC" autocomplete="nickname" autocapitalize="characters">
+        </label>
+
+        <label class="field">
+          <span>Emoji</span>
+          <select id="arcadeEmojiSelect">
+            <option value="&#127820;">&#127820;</option>
+            <option value="&#127942;">&#127942;</option>
+            <option value="&#11088;">&#11088;</option>
+            <option value="&#128293;">&#128293;</option>
+            <option value="&#129504;">&#129504;</option>
+            <option value="&#128170;">&#128170;</option>
+            <option value="&#127775;">&#127775;</option>
+          </select>
+        </label>
+
+        <div class="arcade-preview">
+          <span id="arcadeProfilePreviewEmoji">&#127820;</span>
+          <strong id="arcadeProfilePreviewName">JAC</strong>
+        </div>
+
+        <div class="dialog-actions stacked">
+          <button class="primary" id="saveArcadeProfileButton" type="button">Save Profile</button>
+          <button id="skipArcadeProfileButton" type="button">Maybe Later</button>
+        </div>
+      </div>
+    </dialog>
+
+    <script src="scrabble-word-list.js?v=20260620-board2"></script>
+    <script src="app.js?v=20260620-board2"></script>
   </body>
 </html>

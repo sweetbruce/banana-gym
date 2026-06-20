@@ -14,6 +14,8 @@ const DEFAULT_SETTINGS = {
   difficulty: "casual",
   adaptive: true,
   playerName: "",
+  playerEmoji: "",
+  globalScores: false,
   enabledDrills: {
     flash: true,
     unscramble: true,
@@ -27,6 +29,7 @@ const TIME_TRIAL_DURATIONS = [120, 300];
 const LEADERBOARD_LIMIT = 5;
 const LEADERBOARD_TABLE = "banana_gym_scores";
 const LEADERBOARD_CONFIG = globalThis.BANANA_GYM_LEADERBOARD || {};
+const ARCADE_EMOJIS = [0x1F34C, 0x1F3C6, 0x2B50, 0x1F525, 0x1F9E0, 0x1F4AA, 0x1F31F].map((code) => String.fromCodePoint(code));
 
 const TIME_TRIAL_MODES = [
   {
@@ -48,8 +51,8 @@ const TIME_TRIAL_MODES = [
   {
     mode: "scrabble",
     id: "peel",
-    label: "Score Trial",
-    practiceTitle: "Score Trial",
+    label: "Scrabble-Style Trial",
+    practiceTitle: "Scrabble-Style Trial",
     short: "Score valid words using Scrabble letter values.",
     prompt: "Build higher-value words. Your score uses Scrabble letter values without board multipliers."
   },
@@ -347,6 +350,7 @@ let state = {
   lastRound: null,
   workout: null,
   pendingWorkoutStep: null,
+  practiceTimerSeconds: null,
   lastGluePuzzleIndex: -1,
   lastGluePuzzleSignature: "",
   board: [],
@@ -376,6 +380,7 @@ const els = {
   trialsMenu: document.querySelector("#trialsMenu"),
   dailyWorkoutButton: document.querySelector("#dailyWorkoutButton"),
   practiceDrillsButton: document.querySelector("#practiceDrillsButton"),
+  practiceModeButtons: document.querySelectorAll("[data-practice-mode]"),
   timeTrialsButton: document.querySelector("#timeTrialsButton"),
   learnToPlayButton: document.querySelector("#learnToPlayButton"),
   mainPracticeGrid: document.querySelector("#mainPracticeGrid"),
@@ -392,6 +397,15 @@ const els = {
   resetDictionaryButton: document.querySelector("#resetDictionaryButton"),
   difficultySelect: document.querySelector("#difficultySelect"),
   playerNameInput: document.querySelector("#playerNameInput"),
+  playerEmojiSelect: document.querySelector("#playerEmojiSelect"),
+  globalScoresToggle: document.querySelector("#globalScoresToggle"),
+  arcadeProfileDialog: document.querySelector("#arcadeProfileDialog"),
+  arcadeHandleInput: document.querySelector("#arcadeHandleInput"),
+  arcadeEmojiSelect: document.querySelector("#arcadeEmojiSelect"),
+  arcadeProfilePreviewEmoji: document.querySelector("#arcadeProfilePreviewEmoji"),
+  arcadeProfilePreviewName: document.querySelector("#arcadeProfilePreviewName"),
+  saveArcadeProfileButton: document.querySelector("#saveArcadeProfileButton"),
+  skipArcadeProfileButton: document.querySelector("#skipArcadeProfileButton"),
   adaptiveToggle: document.querySelector("#adaptiveToggle"),
   resetSettingsButton: document.querySelector("#resetSettingsButton"),
   saveSettingsButton: document.querySelector("#saveSettingsButton"),
@@ -401,6 +415,7 @@ const els = {
   currentDrillName: document.querySelector("#currentDrillName"),
   sessionExplainer: document.querySelector("#sessionExplainer"),
   sessionMeta: document.querySelector("#sessionMeta"),
+  sessionScoreStrip: document.querySelector("#sessionScoreStrip"),
   drillKicker: document.querySelector("#drillKicker"),
   drillTitle: document.querySelector("#drillTitle"),
   drillPrompt: document.querySelector("#drillPrompt"),
@@ -471,8 +486,12 @@ function bindEvents() {
   els.welcomeSkipButton?.addEventListener("click", () => completeWelcomeChoice("menu"));
   els.dailyWorkoutButton.addEventListener("click", openDailyWorkoutIntro);
   els.practiceDrillsButton.addEventListener("click", () => showHomeMenu("drills"));
-  els.timeTrialsButton.addEventListener("click", () => showHomeMenu("trials"));
+  els.timeTrialsButton.addEventListener("click", openTimeTrialsMenu);
   els.learnToPlayButton.addEventListener("click", () => startLearnToPlay());
+  els.saveArcadeProfileButton?.addEventListener("click", saveArcadeProfileFromDialog);
+  els.skipArcadeProfileButton?.addEventListener("click", skipArcadeProfileDialog);
+  els.arcadeHandleInput?.addEventListener("input", renderArcadeProfilePreview);
+  els.arcadeEmojiSelect?.addEventListener("change", renderArcadeProfilePreview);
   els.startDailyWorkoutButton.addEventListener("click", () => {
     els.dailyWorkoutDialog.close();
     startDailyWorkout();
@@ -480,6 +499,9 @@ function bindEvents() {
   els.cancelDailyWorkoutButton.addEventListener("click", () => els.dailyWorkoutDialog.close());
   document.querySelectorAll("[data-home-menu]").forEach((button) => {
     button.addEventListener("click", () => showHomeMenu(button.dataset.homeMenu));
+  });
+  els.practiceModeButtons.forEach((button) => {
+    button.addEventListener("click", () => setPracticeMode(button.dataset.practiceMode));
   });
   els.settingsButton.addEventListener("click", () => els.settingsDialog.showModal());
   els.saveSettingsButton.addEventListener("click", saveSettingsFromDialog);
@@ -522,7 +544,7 @@ function bindUiFeedback() {
 }
 
 function isFeedbackButton(button) {
-  return Boolean(button.closest("#splashScreen, #homeView, #dailyWorkoutDialog, #settingsDialog"));
+  return Boolean(button.closest("#splashScreen, #homeView, #dailyWorkoutDialog, #settingsDialog, #arcadeProfileDialog"));
 }
 
 function triggerUiFeedback(kind = "tap") {
@@ -567,18 +589,18 @@ function playUiSound(kind) {
 
 function renderHome() {
   renderDailyWorkoutCompletion();
+  renderPracticeModeToggle();
   els.mainPracticeGrid.innerHTML = "";
   getTimeTrialMenuOptions().forEach((trial) => {
     const complete = isCompletedToday(getTimeTrialCompletionKey(trial.mode, trial.seconds));
-    const best = getPersonalBest(trial.mode, trial.seconds);
+    const todayScore = getCompletedTodayScore(getTimeTrialCompletionKey(trial.mode, trial.seconds));
     const button = document.createElement("button");
     button.className = `preset-card${complete ? " is-complete" : ""}`;
     button.innerHTML = `
-      ${renderMenuTitle(trial.menuLabel, complete)}
+      ${renderMenuTitle(trial.menuLabel, complete, todayScore)}
       <span>${escapeHtml(trial.menuShort)}</span>
-      ${best ? `<em class="personal-best-badge">PB ${escapeHtml(String(best.score))}</em>` : ""}
     `;
-    button.setAttribute("aria-label", `${trial.menuLabel}. ${complete ? "Completed today. " : ""}${trial.menuShort}${best ? `. Personal best ${best.score}.` : ""}`);
+    button.setAttribute("aria-label", `${trial.menuLabel}. ${complete ? `Completed today. Today's score ${todayScore || "recorded"}. ` : ""}${trial.menuShort}`);
     button.addEventListener("click", () => startTimeTrial(trial, trial.seconds));
     els.mainPracticeGrid.append(button);
   });
@@ -587,13 +609,38 @@ function renderHome() {
   const visibleOptions = PRACTICE_DRILL_OPTIONS.filter((option) => state.settings.enabledDrills[option.id]);
   const drillOptions = visibleOptions.length ? visibleOptions : PRACTICE_DRILL_OPTIONS;
   drillOptions.forEach((option) => {
-    const complete = isCompletedToday(getPracticeCompletionKey(option));
+    const practiceOptions = getPracticeSessionOptions(option);
+    const completionKey = getPracticeCompletionKey(practiceOptions, state.practiceTimerSeconds);
+    const complete = isCompletedToday(completionKey);
+    const todayScore = getCompletedTodayScore(completionKey);
+    const short = state.practiceTimerSeconds ? `90 sec score run. ${option.short}` : option.short;
     const button = document.createElement("button");
     button.className = `preset-card${complete ? " is-complete" : ""}`;
-    button.innerHTML = `${renderMenuTitle(option.label, complete)}<span>${option.short}</span>`;
-    button.setAttribute("aria-label", `${option.label}. ${complete ? "Completed today. " : ""}${option.short}`);
-    button.addEventListener("click", () => startDrill(option.id, option));
+    button.innerHTML = `${renderMenuTitle(option.label, complete, todayScore)}<span>${escapeHtml(short)}</span>`;
+    button.setAttribute("aria-label", `${option.label}. ${complete ? `Completed today. Today's score ${todayScore || "recorded"}. ` : ""}${short}`);
+    button.addEventListener("click", () => startDrill(option.id, practiceOptions));
     els.presetGrid.append(button);
+  });
+}
+
+function getPracticeSessionOptions(option) {
+  return {
+    ...option,
+    timeLimitSeconds: state.practiceTimerSeconds
+  };
+}
+
+function setPracticeMode(mode) {
+  state.practiceTimerSeconds = mode === "90" ? 90 : null;
+  renderPracticeModeToggle();
+  renderHome();
+}
+
+function renderPracticeModeToggle() {
+  els.practiceModeButtons.forEach((button) => {
+    const active = button.dataset.practiceMode === (state.practiceTimerSeconds ? "90" : "untimed");
+    button.classList.toggle("is-active", active);
+    button.setAttribute("aria-pressed", String(active));
   });
 }
 
@@ -616,8 +663,9 @@ function getTimeTrialMenuOptions() {
   })));
 }
 
-function renderMenuTitle(label, complete) {
-  return `<strong>${escapeHtml(label)}${complete ? ' <span class="completion-mark" aria-hidden="true">&#9989;</span>' : ""}</strong>`;
+function renderMenuTitle(label, complete, scoreLabel = "") {
+  const score = complete && scoreLabel ? ` <span class="completion-score">Today&apos;s Score: ${escapeHtml(String(scoreLabel))}</span>` : "";
+  return `<strong>${escapeHtml(label)}${complete ? ' <span class="completion-mark" aria-hidden="true">&#9989;</span>' : ""}${score}</strong>`;
 }
 
 function getTodayKey() {
@@ -631,8 +679,11 @@ function getTodayKey() {
 function getCompletedTodayState() {
   const today = getTodayKey();
   const completed = state.stats.completedToday;
-  if (completed?.date === today && Array.isArray(completed.items)) return completed;
-  state.stats.completedToday = { date: today, items: [] };
+  if (completed?.date === today && Array.isArray(completed.items)) {
+    completed.scores = completed.scores || {};
+    return completed;
+  }
+  state.stats.completedToday = { date: today, items: [], scores: {} };
   return state.stats.completedToday;
 }
 
@@ -640,16 +691,23 @@ function isCompletedToday(key) {
   return getCompletedTodayState().items.includes(key);
 }
 
-function markCompletedToday(key) {
+function getCompletedTodayScore(key) {
+  if (!key) return "";
+  return getCompletedTodayState().scores?.[key] || "";
+}
+
+function markCompletedToday(key, scoreLabel = "") {
   if (!key) return;
   const completed = getCompletedTodayState();
   if (!completed.items.includes(key)) completed.items.push(key);
+  if (scoreLabel) completed.scores[key] = String(scoreLabel);
 }
 
-function getPracticeCompletionKey(option) {
-  if (option.id === "flash") return `drill:flash:${option.wordMode || "mixed"}`;
-  if (option.id === "trouble") return `drill:trouble:${option.troubleLetter || "mixed"}`;
-  return `drill:${option.id}`;
+function getPracticeCompletionKey(option, seconds = null) {
+  const suffix = seconds ? `:${seconds}` : "";
+  if (option.id === "flash") return `drill:flash:${option.wordMode || "mixed"}${suffix}`;
+  if (option.id === "trouble") return `drill:trouble:${option.troubleLetter || "mixed"}${suffix}`;
+  return `drill:${option.id}${suffix}`;
 }
 
 function getTimeTrialCompletionKey(mode, seconds = TIME_TRIAL_SECONDS) {
@@ -660,9 +718,11 @@ function getSessionCompletionKey(session, nextWorkoutStep) {
   if (session.mode === "daily") return nextWorkoutStep === null ? "daily-workout" : null;
   if (session.mode === "main") return getTimeTrialCompletionKey(session.timeTrialMode, session.timeLimitSeconds);
   if (session.mode !== "drill") return null;
-  if (session.drillId === "flash") return `drill:flash:${session.wordMode || session.flashMode || "mixed"}`;
-  if (session.drillId === "trouble") return `drill:trouble:${session.troubleLetter || "mixed"}`;
-  return `drill:${session.drillId}`;
+  return getPracticeCompletionKey({
+    id: session.drillId,
+    wordMode: session.wordMode || session.flashMode || "mixed",
+    troubleLetter: session.troubleLetter || "mixed"
+  }, session.timeLimitSeconds);
 }
 
 function formatDurationLabel(seconds) {
@@ -676,6 +736,92 @@ function getTimeTrialBestKey(mode, seconds = TIME_TRIAL_SECONDS) {
 
 function getPersonalBest(mode, seconds = TIME_TRIAL_SECONDS) {
   return state.stats.personalBests?.[getTimeTrialBestKey(mode, seconds)] || null;
+}
+
+function getScoreTrackContext(session) {
+  if (!session?.timeLimitSeconds) return null;
+  if (session.timeTrialMode) {
+    const best = getPersonalBest(session.timeTrialMode, session.timeLimitSeconds);
+    return {
+      type: "trial",
+      key: getTimeTrialBestKey(session.timeTrialMode, session.timeLimitSeconds),
+      label: session.timeTrialLabel || "Time Trial",
+      yourHighScore: best?.score ?? "--"
+    };
+  }
+  if (session.timeLimitSeconds === 90 && ["flash", "trouble", "unscramble", "flex"].includes(session.drillId)) {
+    const key = getDrillHighScoreKey(session);
+    const best = getDrillHighScore(key);
+    return {
+      type: "drill",
+      key,
+      label: session.practiceTitle || DRILLS[session.drillId]?.name || "Drill",
+      yourHighScore: best?.displayScore ?? "--"
+    };
+  }
+  return null;
+}
+
+function getDrillHighScoreKey(session) {
+  if (session.drillId === "flash") return `drill:flash:${session.wordMode || session.flashMode || "mixed"}:${session.timeLimitSeconds || 90}`;
+  if (session.drillId === "trouble") return `drill:trouble:${session.troubleLetter || "mixed"}:${session.timeLimitSeconds || 90}`;
+  if (session.drillId === "unscramble") return `drill:unscramble:${session.timeLimitSeconds || 90}`;
+  return `drill:${session.drillId}:${session.timeLimitSeconds || 90}`;
+}
+
+function getDrillHighScore(key) {
+  return state.stats.drillHighScores?.[key] || null;
+}
+
+function recordDrillHighScore(session) {
+  const context = getScoreTrackContext(session);
+  if (!context || context.type !== "drill") return null;
+  const current = makeDrillHighScoreRecord(session, context.key);
+  state.stats.drillHighScores = state.stats.drillHighScores || {};
+  const previous = state.stats.drillHighScores[context.key] || null;
+  const isNew = !previous || current.score > previous.score || (current.score === previous.score && current.tieBreak > previous.tieBreak);
+  if (isNew) state.stats.drillHighScores[context.key] = current;
+  session.drillHighScore = {
+    key: context.key,
+    current,
+    previous,
+    best: isNew ? current : previous,
+    isNew
+  };
+  return session.drillHighScore;
+}
+
+function makeDrillHighScoreRecord(session, key) {
+  let score = getSessionScore(session);
+  let tieBreak = score;
+  let displayScore = String(score);
+  if (session.drillId === "flash") {
+    score = getPercentNumber(session.flashFoundCount || 0, session.flashPossibleCount || 0);
+    tieBreak = session.flashFoundCount || 0;
+    displayScore = `${score}%`;
+  }
+  if (session.drillId === "trouble") {
+    score = getPercentNumber(session.troubleFoundCount || 0, session.troublePossibleCount || 0);
+    tieBreak = session.troubleFoundCount || 0;
+    displayScore = `${score}%`;
+  }
+  if (session.drillId === "unscramble") {
+    score = session.unscrambleScore || 0;
+    tieBreak = session.unscrambleRounds?.length || 0;
+    displayScore = String(score);
+  }
+  return {
+    key,
+    drillId: session.drillId,
+    label: session.practiceTitle || DRILLS[session.drillId]?.name || "Drill",
+    durationSeconds: session.timeLimitSeconds,
+    score,
+    tieBreak,
+    displayScore,
+    playerName: getPlayerName(),
+    playerEmoji: getPlayerEmoji(),
+    playedAt: new Date().toISOString()
+  };
 }
 
 function recordPersonalBest(session) {
@@ -693,7 +839,7 @@ function recordPersonalBest(session) {
     best: isNew ? current : previous,
     isNew
   };
-  if (isNew && hasLeaderboardBackend()) {
+  if (isNew && hasGlobalScoresEnabled()) {
     session.leaderboardSubmitPromise = submitLeaderboardScore(session)
       .then(() => true)
       .catch(() => false);
@@ -716,29 +862,51 @@ function makePersonalBestRecord(session, key) {
     hooks: result.hooks || 0,
     crosses: result.crosses || 0,
     playerName: getPlayerName(),
+    playerEmoji: getPlayerEmoji(),
     playedAt: new Date().toISOString()
   };
+}
+
+function hasArcadeProfile() {
+  return Boolean(sanitizePlayerName(state.settings.playerName));
 }
 
 function getPlayerName() {
   const custom = sanitizePlayerName(state.settings.playerName);
   if (custom) return custom;
   if (!state.stats.playerTag) {
-    state.stats.playerTag = `Player ${Math.floor(1000 + Math.random() * 9000)}`;
+    state.stats.playerTag = `PLY${Math.floor(100 + Math.random() * 900)}`;
   }
   return state.stats.playerTag;
 }
 
+function getDefaultPlayerEmoji() {
+  return ARCADE_EMOJIS[0];
+}
+
+function getPlayerEmoji() {
+  return sanitizePlayerEmoji(state.settings.playerEmoji) || getDefaultPlayerEmoji();
+}
+
 function sanitizePlayerName(name) {
   return String(name || "")
-    .replace(/[^\w .'-]/g, "")
-    .replace(/\s+/g, " ")
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "")
     .trim()
-    .slice(0, 18);
+    .slice(0, 10);
+}
+
+function sanitizePlayerEmoji(value) {
+  const emoji = String(value || "").trim();
+  return ARCADE_EMOJIS.includes(emoji) ? emoji : "";
 }
 
 function hasLeaderboardBackend() {
   return Boolean(LEADERBOARD_CONFIG.supabaseUrl && LEADERBOARD_CONFIG.supabaseAnonKey);
+}
+
+function hasGlobalScoresEnabled() {
+  return Boolean(state.settings.globalScores && hasLeaderboardBackend());
 }
 
 function openDailyWorkoutIntro() {
@@ -747,6 +915,54 @@ function openDailyWorkoutIntro() {
     return;
   }
   startDailyWorkout();
+}
+
+function openTimeTrialsMenu() {
+  showHomeMenu("trials");
+  maybePromptArcadeProfile();
+}
+
+function maybePromptArcadeProfile({ force = false } = {}) {
+  if (!els.arcadeProfileDialog?.showModal) return;
+  if (!force && (hasArcadeProfile() || state.stats.arcadeProfilePrompted)) return;
+  renderArcadeProfileDialog();
+  state.stats.arcadeProfilePrompted = true;
+  saveAll();
+  els.arcadeProfileDialog.showModal();
+  window.setTimeout(() => els.arcadeHandleInput?.focus(), 60);
+}
+
+function renderArcadeProfileDialog() {
+  if (!els.arcadeHandleInput || !els.arcadeEmojiSelect) return;
+  els.arcadeHandleInput.value = sanitizePlayerName(state.settings.playerName) || "";
+  els.arcadeEmojiSelect.value = getPlayerEmoji();
+  renderArcadeProfilePreview();
+}
+
+function renderArcadeProfilePreview() {
+  const name = sanitizePlayerName(els.arcadeHandleInput?.value) || "JAC";
+  const emoji = sanitizePlayerEmoji(els.arcadeEmojiSelect?.value) || getPlayerEmoji();
+  if (els.arcadeProfilePreviewName) els.arcadeProfilePreviewName.textContent = name;
+  if (els.arcadeProfilePreviewEmoji) els.arcadeProfilePreviewEmoji.textContent = emoji;
+}
+
+function saveArcadeProfileFromDialog() {
+  state.settings = {
+    ...state.settings,
+    playerName: sanitizePlayerName(els.arcadeHandleInput?.value),
+    playerEmoji: sanitizePlayerEmoji(els.arcadeEmojiSelect?.value) || getDefaultPlayerEmoji()
+  };
+  state.stats.arcadeProfilePrompted = true;
+  saveAll();
+  renderSettings();
+  renderHome();
+  els.arcadeProfileDialog.close();
+}
+
+function skipArcadeProfileDialog() {
+  state.stats.arcadeProfilePrompted = true;
+  saveAll();
+  els.arcadeProfileDialog.close();
 }
 
 function showHomeMenu(menu) {
@@ -764,9 +980,12 @@ function showHomeMenu(menu) {
 
 function renderSettings() {
   els.difficultySelect.value = state.settings.difficulty;
-  els.playerNameInput.value = state.settings.playerName || "";
-  els.playerNameInput.placeholder = state.stats.playerTag || "Player 1234";
+  els.playerNameInput.value = sanitizePlayerName(state.settings.playerName) || "";
+  els.playerNameInput.placeholder = state.stats.playerTag || "JAC";
+  els.playerEmojiSelect.value = getPlayerEmoji();
   els.adaptiveToggle.checked = state.settings.adaptive;
+  els.globalScoresToggle.checked = Boolean(state.settings.globalScores && hasLeaderboardBackend());
+  els.globalScoresToggle.disabled = !hasLeaderboardBackend();
   els.drillSettings.innerHTML = "";
   DRILL_ORDER.forEach((id) => {
     const drill = DRILLS[id];
@@ -795,7 +1014,9 @@ function saveSettingsFromDialog() {
   state.settings = {
     difficulty: els.difficultySelect.value,
     playerName: sanitizePlayerName(els.playerNameInput.value),
+    playerEmoji: sanitizePlayerEmoji(els.playerEmojiSelect.value) || getDefaultPlayerEmoji(),
     adaptive: els.adaptiveToggle.checked,
+    globalScores: Boolean(els.globalScoresToggle.checked && hasLeaderboardBackend()),
     enabledDrills
   };
   saveAll();
@@ -909,11 +1130,15 @@ function startDrill(id, options = {}) {
     wordMode: options.wordMode || null,
     troubleProfile: options.troubleProfile || null,
     troubleLetter: options.troubleLetter || null,
-    practiceTitle: options.label || options.practiceTitle || null
+    practiceTitle: options.label || options.practiceTitle || null,
+    timeLimitSeconds: options.timeLimitSeconds || null,
+    timerId: null
   });
+  if (state.session.timeLimitSeconds) state.session.timerId = window.setInterval(tickMainPractice, 250);
   resetTiles(12);
   loadDrill(id);
   showView("session");
+  if (state.session.timeLimitSeconds) tickMainPractice();
 }
 
 function startLearnToPlay(options = {}) {
@@ -958,18 +1183,20 @@ function loadDrill(id) {
   els.drillTitle.textContent = title;
   els.drillKicker.textContent = isDaily
     ? `Step ${state.session.workoutIndex + 1} of ${state.session.workoutTotal}`
-    : state.session.mode === "learn" ? "Guided Lesson" : state.session.mode === "main" ? "Take 1 Challenge" : "Practice Drill";
-  const usesTimer = state.session.mode === "main" || (isDaily && state.session.timeLimitSeconds);
+    : state.session.mode === "learn" ? "Guided Lesson" : state.session.mode === "main" ? "Take 1 Challenge" : state.session.timeLimitSeconds ? "90 Sec Score Run" : "Practice Drill";
+  const usesTimer = Boolean(state.session.timeLimitSeconds);
   setSessionMeta(
     usesTimer ? formatTime(state.session.timeLimitSeconds) : isDaily ? `${state.session.workoutIndex + 1}/${state.session.workoutTotal}` : "",
     { timer: usesTimer }
   );
+  renderSessionScoreStrip();
   els.drillSurface.innerHTML = "";
   els.sessionActions.innerHTML = "";
   els.sessionExplainer.textContent = "";
   clearLearnHighlights();
   els.boardWrap.classList.toggle("hidden", !["glue", "flex", "peel", "rebuild", "learn"].includes(id));
-  els.boardWrap.classList.remove("zoom-close", "zoom-mid");
+  els.boardWrap.classList.remove("zoom-close", "zoom-mid", "infinite-grid");
+  els.boardWrap.classList.toggle("infinite-grid", ["peel", "flex"].includes(id) && (state.session.mode === "main" || state.session.timeLimitSeconds));
   window.scrollTo({ top: 0, behavior: "smooth" });
 
   if (id === "flash") renderFlash();
@@ -985,7 +1212,7 @@ function loadDrill(id) {
 }
 
 function tickMainPractice() {
-  if (!state.session || !["main", "daily"].includes(state.session.mode) || !state.session.timeLimitSeconds) return;
+  if (!state.session || !state.session.timeLimitSeconds) return;
   const elapsed = Math.floor((Date.now() - state.session.startedAt) / 1000);
   const remaining = Math.max(0, state.session.timeLimitSeconds - elapsed);
   setSessionMeta(formatTime(remaining), {
@@ -1001,6 +1228,36 @@ function setSessionMeta(text, options = {}) {
   els.sessionMeta.classList.toggle("session-timer", Boolean(options.timer));
   els.sessionMeta.classList.toggle("is-low", Boolean(options.low));
   els.sessionMeta.classList.toggle("is-final", Boolean(options.final));
+}
+
+function renderSessionScoreStrip() {
+  if (!els.sessionScoreStrip) return;
+  const session = state.session;
+  const context = getScoreTrackContext(session);
+  if (!context) {
+    els.sessionScoreStrip.hidden = true;
+    els.sessionScoreStrip.innerHTML = "";
+    return;
+  }
+
+  const globalEnabled = hasGlobalScoresEnabled();
+  els.sessionScoreStrip.hidden = false;
+  els.sessionScoreStrip.innerHTML = `
+    <span><strong>Your High Score</strong><em>${escapeHtml(String(context.yourHighScore))}</em></span>
+    ${globalEnabled && context.type === "trial" ? '<span><strong>Global High Score</strong><em id="sessionGlobalHighScore">--</em></span>' : ""}
+  `;
+  if (globalEnabled && context.type === "trial") loadSessionGlobalHighScore(session);
+}
+
+async function loadSessionGlobalHighScore(session) {
+  const target = document.querySelector("#sessionGlobalHighScore");
+  if (!target) return;
+  try {
+    const scores = await fetchLeaderboardScores(session.timeTrialMode, session.timeLimitSeconds);
+    target.textContent = scores[0]?.score ?? "--";
+  } catch {
+    target.textContent = "--";
+  }
 }
 
 function completeRound() {
@@ -1022,8 +1279,9 @@ function completeRound() {
     state.session.words = state.session.timeTrialResult.words || state.session.words;
     recordPersonalBest(state.session);
   }
+  recordDrillHighScore(state.session);
   const nextWorkoutStep = getNextWorkoutStep(state.session);
-  markCompletedToday(getSessionCompletionKey(state.session, nextWorkoutStep));
+  markCompletedToday(getSessionCompletionKey(state.session, nextWorkoutStep), getTodayScoreLabel(state.session));
   state.stats.sessions = (state.stats.sessions || 0) + 1;
   state.stats.words = (state.stats.words || 0) + state.session.words;
   state.stats.dumps = (state.stats.dumps || 0) + state.session.dumps;
@@ -1205,6 +1463,7 @@ function renderSummary() {
   else if (current?.drillId === "flash") renderFlashSummaryDetails(current);
   else if (current?.drillId === "unscramble") renderUnscrambleSummaryDetails(current);
   else if (current?.drillId === "trouble") renderTroubleSummaryDetails(current);
+  renderDrillHighScoreSummary(current);
 
   if (current?.mode === "daily") {
     els.playAgainButton.textContent = state.pendingWorkoutStep !== null ? "Next Exercise" : "Repeat 5-Min Workout";
@@ -1241,7 +1500,7 @@ function renderTimeTrialSummaryDetails(session) {
   };
   const best = bestInfo.best || bestInfo.current;
   const previous = bestInfo.previous;
-  const bestLabel = bestInfo.isNew ? "New Personal Best" : "Personal Best";
+  const bestLabel = bestInfo.isNew ? "New High Score" : "Your High Score";
   const detail = getTimeTrialDetail(session);
   const previousCopy = previous ? `Previous best: ${previous.score}.` : "First saved score for this mode.";
   els.summaryDetails.innerHTML = `
@@ -1257,12 +1516,30 @@ function renderTimeTrialSummaryDetails(session) {
         <span>${escapeHtml(`${formatDurationLabel(session.timeLimitSeconds)} ${session.timeTrialLabel || "Time Trial"}`)}</span>
       </div>
       <ol id="leaderboardRows" class="leaderboard-rows">
-        <li><span>1</span><strong>${escapeHtml(best?.playerName || getPlayerName())}</strong><em>${escapeHtml(String(best?.score ?? session.timeTrialResult.score ?? 0))}</em></li>
+        <li><span>1</span><strong>${renderPlayerDisplay(best?.playerName || getPlayerName(), best?.playerEmoji || getPlayerEmoji())}</strong><em>${escapeHtml(String(best?.score ?? session.timeTrialResult.score ?? 0))}</em></li>
       </ol>
-      <p id="leaderboardStatus">${hasLeaderboardBackend() ? "Loading global high scores..." : "Personal bests are live. Add Supabase config to turn on global scores."}</p>
+      <p id="leaderboardStatus">${hasGlobalScoresEnabled() ? "Loading global high scores..." : "High scores are saved on this device. Enable global scores in Settings after backend setup."}</p>
     </div>
   `;
-  if (hasLeaderboardBackend()) syncLeaderboardPanel(session);
+  if (hasGlobalScoresEnabled()) syncLeaderboardPanel(session);
+}
+
+function renderDrillHighScoreSummary(session) {
+  if (!session?.drillHighScore) return;
+  const scoreInfo = session.drillHighScore;
+  const best = scoreInfo.best || scoreInfo.current;
+  const previous = scoreInfo.previous;
+  const label = scoreInfo.isNew ? "New High Score" : "Your High Score";
+  const drillLabel = session.practiceTitle || DRILLS[session.drillId]?.name || "Practice Drill";
+  const previousCopy = previous ? `Previous high score: ${previous.displayScore}.` : "First saved score for this drill.";
+  els.summaryDetails.insertAdjacentHTML("afterbegin", `
+    <div class="summary-score-card personal-best-card">
+      <span>${label}</span>
+      <strong>${escapeHtml(String(best?.displayScore ?? scoreInfo.current?.displayScore ?? getSessionScore(session)))}</strong>
+      <em>${escapeHtml(`${formatDurationLabel(session.timeLimitSeconds)} ${drillLabel}`)}</em>
+      <p>${escapeHtml(scoreInfo.isNew ? previousCopy : `Score to beat: ${best?.displayScore ?? "--"}.`)}</p>
+    </div>
+  `);
 }
 
 async function syncLeaderboardPanel(session) {
@@ -1272,7 +1549,7 @@ async function syncLeaderboardPanel(session) {
 
   try {
     if (session.personalBest?.isNew) {
-      status.textContent = "Submitting new personal best...";
+      status.textContent = "Submitting new high score...";
       const submitted = await (session.leaderboardSubmitPromise || submitLeaderboardScore(session).then(() => true));
       if (!submitted) throw new Error("Leaderboard submit failed");
     }
@@ -1280,10 +1557,10 @@ async function syncLeaderboardPanel(session) {
     const scores = await fetchLeaderboardScores(session.timeTrialMode, session.timeLimitSeconds);
     rows.innerHTML = scores.length
       ? scores.map((score, index) => renderLeaderboardRow(score, index)).join("")
-      : `<li><span>1</span><strong>${escapeHtml(getPlayerName())}</strong><em>${escapeHtml(String(session.timeTrialResult.score || 0))}</em></li>`;
+      : `<li><span>1</span><strong>${renderPlayerDisplay(getPlayerName(), getPlayerEmoji())}</strong><em>${escapeHtml(String(session.timeTrialResult.score || 0))}</em></li>`;
     status.textContent = scores.length ? "Global board loaded." : "No global scores yet. Your score is ready to lead it.";
   } catch {
-    status.textContent = "Global board could not be reached. Personal best is saved locally.";
+    status.textContent = "Global board could not be reached. Your high score is saved locally.";
   }
 }
 
@@ -1291,10 +1568,15 @@ function renderLeaderboardRow(score, index) {
   return `
     <li>
       <span>${index + 1}</span>
-      <strong>${escapeHtml(score.player_name || score.playerName || "Player")}</strong>
+      <strong>${renderPlayerDisplay(score.player_name || score.playerName || "PLAYER", score.player_emoji || score.playerEmoji || "")}</strong>
       <em>${escapeHtml(String(score.score || 0))}</em>
     </li>
   `;
+}
+
+function renderPlayerDisplay(name, emoji) {
+  const badge = sanitizePlayerEmoji(emoji) || getDefaultPlayerEmoji();
+  return `<span class="leaderboard-emoji">${escapeHtml(badge)}</span>${escapeHtml(sanitizePlayerName(name) || "PLAYER")}`;
 }
 
 async function submitLeaderboardScore(session) {
@@ -1309,7 +1591,7 @@ async function submitLeaderboardScore(session) {
 
 async function fetchLeaderboardScores(mode, seconds) {
   const params = [
-    "select=player_name,score,words,letters,invalid,created_at",
+    "select=player_name,player_emoji,score,words,letters,invalid,created_at",
     `mode=eq.${encodeURIComponent(mode || "letters")}`,
     `duration_seconds=eq.${encodeURIComponent(seconds || TIME_TRIAL_SECONDS)}`,
     "order=score.desc,created_at.asc",
@@ -1326,6 +1608,7 @@ function buildLeaderboardPayload(session) {
   const result = session.timeTrialResult || {};
   return {
     player_name: getPlayerName(),
+    player_emoji: getPlayerEmoji(),
     mode: session.timeTrialMode || result.mode || "letters",
     duration_seconds: session.timeLimitSeconds || TIME_TRIAL_SECONDS,
     score: result.score || 0,
@@ -1417,6 +1700,17 @@ function getTimeTrialDetail(session) {
   return `${result.words} words, ${result.letters} letters, ${result.invalid} invalid`;
 }
 
+function getTodayScoreLabel(session) {
+  if (!session) return "";
+  if (session.timeTrialResult) return session.timeTrialResult.score || 0;
+  if (session.drillId === "flash") return formatPercent(session.flashFoundCount || 0, session.flashPossibleCount || 0);
+  if (session.drillId === "trouble") return formatPercent(session.troubleFoundCount || 0, session.troublePossibleCount || 0);
+  if (session.drillId === "unscramble") return session.unscrambleScore || 0;
+  if (session.drillId === "flex") return session.flexScore?.score || 0;
+  if (session.drillId === "glue") return session.glueSolved ? "Done" : `${session.glueComponents || 0} islands`;
+  return session.words || 0;
+}
+
 function calculateTimeTrialResult(session) {
   const mode = session.timeTrialMode || "letters";
   const words = getValidBoardWords();
@@ -1456,8 +1750,12 @@ function getWordScore(word) {
 }
 
 function formatPercent(found, possible) {
-  if (!possible) return "0%";
-  return `${Math.round((found / possible) * 100)}%`;
+  return `${getPercentNumber(found, possible)}%`;
+}
+
+function getPercentNumber(found, possible) {
+  if (!possible) return 0;
+  return Math.round((found / possible) * 100);
 }
 
 function makeUnscrambleSetup() {

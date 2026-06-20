@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Banana Gym">
+  <rect width="64" height="64" rx="14" fill="#ffd43b"/>
+  <circle cx="32" cy="32" r="24" fill="#fff7cf"/>
+  <path d="M18 38c13 12 31 9 39-7-7 4-16 3-24-2-7-5-11-12-12-21-6 9-9 20-3 30z" fill="#f59f00"/>
+  <path d="M22 36c10 8 24 6 31-4-7 2-14 1-21-4-5-4-9-10-10-17-4 8-5 17 0 25z" fill="#ffe066"/>
+  <path d="M18 39c-4 1-7 4-9 7 5 1 10-1 13-5z" fill="#7a4b00"/>
+  <path d="M21 9c-2-4-5-6-8-6 0 5 3 9 8 11z" fill="#8a5a12"/>
+  <path d="M24 16c-2-5-5-8-10-10 4 6 5 13 3 21" fill="none" stroke="#fff3bf" stroke-width="4" stroke-linecap="round"/>
+</svg>

@@ -246,6 +246,38 @@ h3 {
   line-height: 1.35;
 }
 
+.practice-mode-toggle {
+  width: min(100%, 340px);
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.18rem;
+  margin: 0.72rem auto 0;
+  padding: 0.22rem;
+  border: 1px solid rgba(128, 86, 0, 0.18);
+  border-radius: 8px;
+  background: rgba(255, 253, 250, 0.82);
+  box-shadow: inset 0 1px 3px rgba(80, 56, 8, 0.08);
+}
+
+.practice-mode-toggle button {
+  min-height: 42px;
+  padding: 0.42rem 0.65rem;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  box-shadow: none;
+  color: var(--muted);
+  font-size: 0.95rem;
+  font-weight: 900;
+}
+
+.practice-mode-toggle button.is-active {
+  border-color: rgba(245, 159, 0, 0.55);
+  background: linear-gradient(180deg, #fff6c4, #ffd43b);
+  color: #2c1b00;
+  box-shadow: 0 2px 0 rgba(128, 86, 0, 0.14);
+}
+
 .mascot {
   width: 82px;
   height: 82px;
@@ -458,26 +490,22 @@ h3 {
   line-height: 1.24;
 }
 
-.personal-best-badge {
-  display: inline-grid;
-  place-items: center;
-  justify-self: center;
-  margin-top: 0.42rem;
-  padding: 0.18rem 0.5rem;
-  border: 1px solid rgba(124, 179, 66, 0.28);
-  border-radius: 999px;
-  background: #f1ffd7;
-  color: #3f6212;
-  font-size: 0.78rem;
-  font-style: normal;
-  font-weight: 950;
-}
-
 .preset-card .completion-mark,
 .lane-button .completion-mark {
   display: inline;
   color: #3f6212;
   font-size: 0.9em;
+  white-space: nowrap;
+}
+
+.completion-score {
+  display: inline-block;
+  margin-left: 0.28rem;
+  color: #3f6212;
+  font-size: 0.58em;
+  font-weight: 900;
+  line-height: 1;
+  vertical-align: middle;
   white-space: nowrap;
 }
 
@@ -565,6 +593,43 @@ h3 {
 
 .session-status span.session-timer.is-final {
   animation: timerFinal 320ms ease-in-out infinite;
+}
+
+.session-score-strip {
+  display: inline-grid;
+  grid-auto-flow: column;
+  gap: 0.45rem;
+  justify-content: center;
+  margin-top: 0.45rem;
+}
+
+.session-score-strip[hidden] {
+  display: none;
+}
+
+.session-score-strip span {
+  min-width: 122px;
+  display: grid;
+  gap: 0.12rem;
+  padding: 0.38rem 0.62rem;
+  border: 1px solid rgba(124, 179, 66, 0.3);
+  border-radius: 8px;
+  background: #f1ffd7;
+  color: #3f6212;
+  line-height: 1;
+}
+
+.session-score-strip strong {
+  font-size: 0.72rem;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.session-score-strip em {
+  color: var(--ink);
+  font-size: 1.05rem;
+  font-style: normal;
+  font-weight: 950;
 }
 
 .text-button {
@@ -951,7 +1016,7 @@ h3 {
 
 .board-wrap {
   margin-top: 0;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .board-toolbar {
@@ -981,6 +1046,10 @@ h3 {
   text-align: center;
 }
 
+.board-viewport {
+  overflow: visible;
+}
+
 .board {
   display: grid;
   width: 100%;
@@ -1002,6 +1071,44 @@ h3 {
 .board-wrap.zoom-mid .board {
   width: min(106%, 600px);
   max-width: none;
+}
+
+.board-wrap.infinite-grid {
+  --grid-shift-y: clamp(70px, 12vw, 104px);
+}
+
+.board-wrap.infinite-grid .board-viewport {
+  height: clamp(340px, 56dvh, 520px);
+  overflow: hidden;
+  border-radius: 8px;
+}
+
+.board-wrap.infinite-grid .board {
+  width: min(152%, 840px);
+  max-width: none;
+  margin-left: 50%;
+  margin-right: 0;
+  margin-bottom: 0;
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  transform: translate(-50%, calc(-1 * var(--grid-shift-y)));
+}
+
+.board-wrap.infinite-grid.zoom-close {
+  --grid-shift-y: clamp(82px, 14vw, 128px);
+}
+
+.board-wrap.infinite-grid.zoom-close .board {
+  width: min(176%, 940px);
+}
+
+.board-wrap.infinite-grid.zoom-mid {
+  --grid-shift-y: clamp(74px, 12vw, 112px);
+}
+
+.board-wrap.infinite-grid.zoom-mid .board {
+  width: min(164%, 900px);
 }
 
 .cell {
@@ -1338,7 +1445,7 @@ h3 {
   background: #fff6c4;
 }
 
-.leaderboard-rows li span {
+.leaderboard-rows li > span {
   display: grid;
   place-items: center;
   width: 1.55rem;
@@ -1348,6 +1455,12 @@ h3 {
   color: var(--ink);
   font-size: 0.78rem;
   font-weight: 950;
+}
+
+.leaderboard-emoji {
+  display: inline;
+  margin-right: 0.28rem;
+  font-size: 1em;
 }
 
 .leaderboard-rows li em {
@@ -1371,10 +1484,38 @@ dialog::backdrop {
   background: rgba(39, 32, 15, 0.35);
 }
 
-.settings {
+.settings,
+.arcade-profile {
   padding: 1rem;
   max-height: inherit;
   overflow: auto;
+}
+
+.arcade-profile {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.arcade-preview {
+  min-height: 72px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.65rem;
+  border: 1px solid rgba(245, 159, 0, 0.3);
+  border-radius: 8px;
+  background: linear-gradient(180deg, #fff6c4, #fffdfa);
+}
+
+.arcade-preview span {
+  font-size: 2rem;
+  line-height: 1;
+}
+
+.arcade-preview strong {
+  font-size: 1.8rem;
+  line-height: 1;
+  letter-spacing: 0;
 }
 
 .dialog-copy {
@@ -1523,6 +1664,15 @@ dialog::backdrop {
     line-height: 1.22;
   }
 
+  .practice-mode-toggle {
+    margin-top: 0.5rem;
+  }
+
+  .practice-mode-toggle button {
+    min-height: 38px;
+    font-size: 0.86rem;
+  }
+
   .lane-button,
   .lane-button.recommended {
     min-height: auto;
@@ -1567,17 +1717,20 @@ dialog::backdrop {
   }
 
   .session-panel[data-drill="flash"],
-  .session-panel[data-drill="trouble"] {
+  .session-panel[data-drill="trouble"],
+  .session-panel[data-drill="unscramble"] {
     min-height: calc(100dvh - 8rem);
   }
 
   .session-panel[data-drill="flash"] .drill-card,
-  .session-panel[data-drill="trouble"] .drill-card {
+  .session-panel[data-drill="trouble"] .drill-card,
+  .session-panel[data-drill="unscramble"] .drill-card {
     padding: 0.72rem;
   }
 
   .session-panel[data-drill="flash"] .attempt-list,
-  .session-panel[data-drill="trouble"] .attempt-list {
+  .session-panel[data-drill="trouble"] .attempt-list,
+  .session-panel[data-drill="unscramble"] .attempt-list {
     min-height: 48px;
     padding: 0.52rem;
   }
@@ -1698,6 +1851,17 @@ dialog::backdrop {
     margin-top: 0.14rem;
     font-size: 0.84rem;
     line-height: 1.18;
+  }
+
+  .practice-mode-toggle {
+    width: min(100%, 300px);
+    margin-top: 0.38rem;
+  }
+
+  .practice-mode-toggle button {
+    min-height: 34px;
+    padding: 0.34rem 0.48rem;
+    font-size: 0.78rem;
   }
 
   .preset-grid {
@@ -1824,6 +1988,7 @@ dialog::backdrop {
 
   .session-panel[data-drill="flash"] .drill-card,
   .session-panel[data-drill="trouble"] .drill-card,
+  .session-panel[data-drill="unscramble"] .drill-card,
   .session-panel[data-drill="review"] .drill-card {
     width: min(100%, 680px);
     grid-column: 1 / -1;

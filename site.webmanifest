@@ -1,0 +1,18 @@
+{
+  "name": "Brooke's Bananagram Gym",
+  "short_name": "Banana Gym",
+  "description": "A friendly Bananagrams training app with daily workouts, drills, and time trials.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#fffaf0",
+  "theme_color": "#ffd43b",
+  "icons": [
+    {
+      "src": "favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
