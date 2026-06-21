@@ -1581,6 +1581,11 @@ dialog::backdrop {
   border-bottom: 1px solid var(--line);
 }
 
+.toggle-row.is-disabled {
+  color: var(--muted);
+  opacity: 0.68;
+}
+
 .field select,
 .field input {
   min-height: 44px;

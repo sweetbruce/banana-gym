@@ -15,7 +15,8 @@ const DEFAULT_SETTINGS = {
   adaptive: true,
   playerName: "",
   playerEmoji: "",
-  globalScores: false,
+  globalScores: true,
+  globalScoresUserSet: false,
   enabledDrills: {
     flash: true,
     unscramble: true,
@@ -26,7 +27,7 @@ const DEFAULT_SETTINGS = {
 
 const TIME_TRIAL_SECONDS = 120;
 const TIME_TRIAL_DURATIONS = [120, 300];
-const LEADERBOARD_LIMIT = 5;
+const LEADERBOARD_LIMIT = 10;
 const LEADERBOARD_TABLE = "banana_gym_scores";
 const LEADERBOARD_CONFIG = globalThis.BANANA_GYM_LEADERBOARD || {};
 const ARCADE_EMOJIS = [0x1F34C, 0x1F3C6, 0x2B50, 0x1F525, 0x1F9E0, 0x1F4AA, 0x1F31F].map((code) => String.fromCodePoint(code));
@@ -510,6 +511,7 @@ function bindEvents() {
   els.resetDictionaryButton.addEventListener("click", resetDictionary);
   els.resetSettingsButton.addEventListener("click", () => {
     state.settings = structuredClone(DEFAULT_SETTINGS);
+    state.settings = normalizeSettings(state.settings);
     saveAll();
     renderSettings();
     renderHome();
@@ -734,6 +736,10 @@ function getTimeTrialBestKey(mode, seconds = TIME_TRIAL_SECONDS) {
   return `${mode || "letters"}:${seconds || TIME_TRIAL_SECONDS}`;
 }
 
+function getTimeTrialScoreKey(mode, seconds = TIME_TRIAL_SECONDS) {
+  return `trial:${mode || "letters"}:${seconds || TIME_TRIAL_SECONDS}`;
+}
+
 function getPersonalBest(mode, seconds = TIME_TRIAL_SECONDS) {
   return state.stats.personalBests?.[getTimeTrialBestKey(mode, seconds)] || null;
 }
@@ -744,7 +750,7 @@ function getScoreTrackContext(session) {
     const best = getPersonalBest(session.timeTrialMode, session.timeLimitSeconds);
     return {
       type: "trial",
-      key: getTimeTrialBestKey(session.timeTrialMode, session.timeLimitSeconds),
+      key: getTimeTrialScoreKey(session.timeTrialMode, session.timeLimitSeconds),
       label: session.timeTrialLabel || "Time Trial",
       yourHighScore: best?.score ?? "--"
     };
@@ -788,6 +794,11 @@ function recordDrillHighScore(session) {
     best: isNew ? current : previous,
     isNew
   };
+  if (isNew && hasGlobalScoresEnabled()) {
+    session.leaderboardSubmitPromise = submitLeaderboardScore(session)
+      .then(() => true)
+      .catch(() => false);
+  }
   return session.drillHighScore;
 }
 
@@ -979,13 +990,17 @@ function showHomeMenu(menu) {
 }
 
 function renderSettings() {
+  state.settings = normalizeSettings(state.settings);
   els.difficultySelect.value = state.settings.difficulty;
   els.playerNameInput.value = sanitizePlayerName(state.settings.playerName) || "";
   els.playerNameInput.placeholder = state.stats.playerTag || "JAC";
   els.playerEmojiSelect.value = getPlayerEmoji();
   els.adaptiveToggle.checked = state.settings.adaptive;
-  els.globalScoresToggle.checked = Boolean(state.settings.globalScores && hasLeaderboardBackend());
-  els.globalScoresToggle.disabled = !hasLeaderboardBackend();
+  const hasBackend = hasLeaderboardBackend();
+  els.globalScoresToggle.checked = Boolean(state.settings.globalScores && hasBackend);
+  els.globalScoresToggle.disabled = !hasBackend;
+  els.globalScoresToggle.closest(".toggle-row")?.classList.toggle("is-disabled", !hasBackend);
+  els.globalScoresToggle.title = hasBackend ? "Global high scores are enabled by default." : "Add Supabase config to enable global high scores.";
   els.drillSettings.innerHTML = "";
   DRILL_ORDER.forEach((id) => {
     const drill = DRILLS[id];
@@ -1017,6 +1032,7 @@ function saveSettingsFromDialog() {
     playerEmoji: sanitizePlayerEmoji(els.playerEmojiSelect.value) || getDefaultPlayerEmoji(),
     adaptive: els.adaptiveToggle.checked,
     globalScores: Boolean(els.globalScoresToggle.checked && hasLeaderboardBackend()),
+    globalScoresUserSet: true,
     enabledDrills
   };
   saveAll();
@@ -1244,17 +1260,19 @@ function renderSessionScoreStrip() {
   els.sessionScoreStrip.hidden = false;
   els.sessionScoreStrip.innerHTML = `
     <span><strong>Your High Score</strong><em>${escapeHtml(String(context.yourHighScore))}</em></span>
-    ${globalEnabled && context.type === "trial" ? '<span><strong>Global High Score</strong><em id="sessionGlobalHighScore">--</em></span>' : ""}
+    ${globalEnabled ? '<span><strong>Global High Score</strong><em id="sessionGlobalHighScore">--</em></span>' : ""}
   `;
-  if (globalEnabled && context.type === "trial") loadSessionGlobalHighScore(session);
+  if (globalEnabled) loadSessionGlobalHighScore(session);
 }
 
 async function loadSessionGlobalHighScore(session) {
   const target = document.querySelector("#sessionGlobalHighScore");
   if (!target) return;
+  const context = getScoreTrackContext(session);
+  if (!context?.key) return;
   try {
-    const scores = await fetchLeaderboardScores(session.timeTrialMode, session.timeLimitSeconds);
-    target.textContent = scores[0]?.score ?? "--";
+    const scores = await fetchLeaderboardScores(context.key);
+    target.textContent = scores[0]?.display_score ?? scores[0]?.score ?? "--";
   } catch {
     target.textContent = "--";
   }
@@ -1511,14 +1529,7 @@ function renderTimeTrialSummaryDetails(session) {
       <p>${escapeHtml(bestInfo.isNew ? previousCopy : `${detail}. Score to beat: ${best?.score ?? 0}.`)}</p>
     </div>
     <div class="leaderboard-card">
-      <div>
-        <strong>Global High Scores</strong>
-        <span>${escapeHtml(`${formatDurationLabel(session.timeLimitSeconds)} ${session.timeTrialLabel || "Time Trial"}`)}</span>
-      </div>
-      <ol id="leaderboardRows" class="leaderboard-rows">
-        <li><span>1</span><strong>${renderPlayerDisplay(best?.playerName || getPlayerName(), best?.playerEmoji || getPlayerEmoji())}</strong><em>${escapeHtml(String(best?.score ?? session.timeTrialResult.score ?? 0))}</em></li>
-      </ol>
-      <p id="leaderboardStatus">${hasGlobalScoresEnabled() ? "Loading global high scores..." : "High scores are saved on this device. Enable global scores in Settings after backend setup."}</p>
+      ${renderLeaderboardCard(session, `${formatDurationLabel(session.timeLimitSeconds)} ${session.timeTrialLabel || "Time Trial"}`, best?.score ?? session.timeTrialResult.score ?? 0)}
     </div>
   `;
   if (hasGlobalScoresEnabled()) syncLeaderboardPanel(session);
@@ -1539,25 +1550,45 @@ function renderDrillHighScoreSummary(session) {
       <em>${escapeHtml(`${formatDurationLabel(session.timeLimitSeconds)} ${drillLabel}`)}</em>
       <p>${escapeHtml(scoreInfo.isNew ? previousCopy : `Score to beat: ${best?.displayScore ?? "--"}.`)}</p>
     </div>
+    <div class="leaderboard-card">
+      ${renderLeaderboardCard(session, `${formatDurationLabel(session.timeLimitSeconds)} ${drillLabel}`, best?.displayScore ?? scoreInfo.current?.displayScore ?? getSessionScore(session))}
+    </div>
   `);
+  if (hasGlobalScoresEnabled()) syncLeaderboardPanel(session);
+}
+
+function renderLeaderboardCard(session, label, fallbackScore) {
+  return `
+    <div>
+      <strong>Global Top 10</strong>
+      <span>${escapeHtml(label)}</span>
+    </div>
+    <ol id="leaderboardRows" class="leaderboard-rows">
+      <li><span>1</span><strong>${renderPlayerDisplay(getPlayerName(), getPlayerEmoji())}</strong><em>${escapeHtml(String(fallbackScore ?? getSessionScore(session)))}</em></li>
+    </ol>
+    <p id="leaderboardStatus">${hasGlobalScoresEnabled() ? "Loading global high scores..." : "High scores are saved on this device. Enable global scores in Settings after backend setup."}</p>
+  `;
 }
 
 async function syncLeaderboardPanel(session) {
   const status = document.querySelector("#leaderboardStatus");
   const rows = document.querySelector("#leaderboardRows");
   if (!status || !rows) return;
+  const payload = buildLeaderboardPayload(session);
+  if (!payload?.score_key) return;
 
   try {
-    if (session.personalBest?.isNew) {
+    const highScoreInfo = session.personalBest || session.drillHighScore;
+    if (highScoreInfo?.isNew) {
       status.textContent = "Submitting new high score...";
       const submitted = await (session.leaderboardSubmitPromise || submitLeaderboardScore(session).then(() => true));
       if (!submitted) throw new Error("Leaderboard submit failed");
     }
     status.textContent = "Loading global high scores...";
-    const scores = await fetchLeaderboardScores(session.timeTrialMode, session.timeLimitSeconds);
+    const scores = await fetchLeaderboardScores(payload.score_key);
     rows.innerHTML = scores.length
       ? scores.map((score, index) => renderLeaderboardRow(score, index)).join("")
-      : `<li><span>1</span><strong>${renderPlayerDisplay(getPlayerName(), getPlayerEmoji())}</strong><em>${escapeHtml(String(session.timeTrialResult.score || 0))}</em></li>`;
+      : `<li><span>1</span><strong>${renderPlayerDisplay(getPlayerName(), getPlayerEmoji())}</strong><em>${escapeHtml(payload.display_score)}</em></li>`;
     status.textContent = scores.length ? "Global board loaded." : "No global scores yet. Your score is ready to lead it.";
   } catch {
     status.textContent = "Global board could not be reached. Your high score is saved locally.";
@@ -1569,7 +1600,7 @@ function renderLeaderboardRow(score, index) {
     <li>
       <span>${index + 1}</span>
       <strong>${renderPlayerDisplay(score.player_name || score.playerName || "PLAYER", score.player_emoji || score.playerEmoji || "")}</strong>
-      <em>${escapeHtml(String(score.score || 0))}</em>
+      <em>${escapeHtml(String(score.display_score || score.displayScore || score.score || 0))}</em>
     </li>
   `;
 }
@@ -1581,6 +1612,7 @@ function renderPlayerDisplay(name, emoji) {
 
 async function submitLeaderboardScore(session) {
   const payload = buildLeaderboardPayload(session);
+  if (!payload) throw new Error("Leaderboard payload missing");
   const response = await fetch(getLeaderboardUrl(), {
     method: "POST",
     headers: getLeaderboardHeaders({ Prefer: "return=minimal" }),
@@ -1589,12 +1621,11 @@ async function submitLeaderboardScore(session) {
   if (!response.ok) throw new Error("Leaderboard submit failed");
 }
 
-async function fetchLeaderboardScores(mode, seconds) {
+async function fetchLeaderboardScores(scoreKey) {
   const params = [
-    "select=player_name,player_emoji,score,words,letters,invalid,created_at",
-    `mode=eq.${encodeURIComponent(mode || "letters")}`,
-    `duration_seconds=eq.${encodeURIComponent(seconds || TIME_TRIAL_SECONDS)}`,
-    "order=score.desc,created_at.asc",
+    "select=player_name,player_emoji,score,display_score,tie_break,words,letters,invalid,hooks,crosses,created_at",
+    `score_key=eq.${encodeURIComponent(scoreKey)}`,
+    "order=score.desc,tie_break.desc,created_at.asc",
     `limit=${LEADERBOARD_LIMIT}`
   ].join("&");
   const response = await fetch(`${getLeaderboardUrl()}?${params}`, {
@@ -1605,19 +1636,68 @@ async function fetchLeaderboardScores(mode, seconds) {
 }
 
 function buildLeaderboardPayload(session) {
-  const result = session.timeTrialResult || {};
+  if (!session?.timeLimitSeconds) return null;
+  const result = session.timeTrialResult || null;
+  if (result) {
+    const score = result.score || 0;
+    return {
+      score_key: getTimeTrialScoreKey(session.timeTrialMode || result.mode, session.timeLimitSeconds),
+      score_type: "time_trial",
+      label: session.timeTrialLabel || result.label || "Time Trial",
+      duration_seconds: session.timeLimitSeconds || TIME_TRIAL_SECONDS,
+      score,
+      tie_break: getTimeTrialTieBreak(result),
+      display_score: String(score),
+      player_name: getPlayerName(),
+      player_emoji: getPlayerEmoji(),
+      words: result.words || 0,
+      letters: result.letters || 0,
+      invalid: result.invalid || 0,
+      hooks: result.hooks || 0,
+      crosses: result.crosses || 0,
+      metadata: {
+        mode: session.timeTrialMode || result.mode || "letters",
+        scrabble: result.scrabble || 0,
+        detail: getTimeTrialDetail(session)
+      },
+      created_at: new Date().toISOString()
+    };
+  }
+
+  const highScore = session.drillHighScore?.current || makeDrillHighScoreRecord(session, getDrillHighScoreKey(session));
+  if (!highScore) return null;
+  const flexScore = session.drillId === "flex" ? session.flexScore || calculateFlexScore() : null;
   return {
+    score_key: highScore.key,
+    score_type: "drill",
+    label: highScore.label,
+    duration_seconds: session.timeLimitSeconds,
+    score: highScore.score || 0,
+    tie_break: highScore.tieBreak || 0,
+    display_score: highScore.displayScore || String(highScore.score || 0),
     player_name: getPlayerName(),
     player_emoji: getPlayerEmoji(),
-    mode: session.timeTrialMode || result.mode || "letters",
-    duration_seconds: session.timeLimitSeconds || TIME_TRIAL_SECONDS,
-    score: result.score || 0,
-    words: result.words || 0,
-    letters: result.letters || 0,
-    invalid: result.invalid || 0,
-    detail: getTimeTrialDetail(session),
+    words: session.words || 0,
+    letters: session.lettersPlaced || 0,
+    invalid: session.invalidTiles || 0,
+    hooks: flexScore ? getFlexMetric(flexScore, "hooks") : 0,
+    crosses: flexScore ? getFlexMetric(flexScore, "crosses") : 0,
+    metadata: {
+      drillId: session.drillId,
+      wordMode: session.wordMode || session.flashMode || null,
+      troubleLetter: session.troubleLetter || null,
+      possible: session.flashPossibleCount || session.troublePossibleCount || null,
+      found: session.flashFoundCount || session.troubleFoundCount || null
+    },
     created_at: new Date().toISOString()
   };
+}
+
+function getTimeTrialTieBreak(result) {
+  if (!result) return 0;
+  if (result.mode === "flex") return (result.hooks || 0) + (result.crosses || 0);
+  if (result.mode === "words") return result.letters || 0;
+  return result.words || result.letters || 0;
 }
 
 function getLeaderboardUrl() {
@@ -3587,17 +3667,25 @@ function resetDictionary() {
 function loadSettings() {
   try {
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY))?.settings || {};
-    return {
-      ...structuredClone(DEFAULT_SETTINGS),
-      ...saved,
-      enabledDrills: {
-        ...DEFAULT_SETTINGS.enabledDrills,
-        ...(saved.enabledDrills || {})
-      }
-    };
+    return normalizeSettings(saved);
   } catch {
-    return structuredClone(DEFAULT_SETTINGS);
+    return normalizeSettings();
   }
+}
+
+function normalizeSettings(saved = {}) {
+  const backendReady = hasLeaderboardBackend();
+  const userSetGlobalScores = Boolean(saved.globalScoresUserSet);
+  return {
+    ...structuredClone(DEFAULT_SETTINGS),
+    ...saved,
+    globalScores: backendReady && (userSetGlobalScores ? Boolean(saved.globalScores) : true),
+    globalScoresUserSet: userSetGlobalScores,
+    enabledDrills: {
+      ...DEFAULT_SETTINGS.enabledDrills,
+      ...(saved.enabledDrills || {})
+    }
+  };
 }
 
 function loadDictionary() {
