@@ -1075,6 +1075,8 @@ h3 {
 
 .board-wrap.infinite-grid {
   --grid-shift-y: clamp(70px, 12vw, 104px);
+  --board-pan-x: 0px;
+  --board-pan-y: 0px;
 }
 
 .board-wrap.infinite-grid .board-viewport {
@@ -1092,7 +1094,8 @@ h3 {
   padding: 0;
   border-radius: 0;
   background: transparent;
-  transform: translate(-50%, calc(-1 * var(--grid-shift-y)));
+  transform: translate(calc(-50% + var(--board-pan-x)), calc(-1 * var(--grid-shift-y) + var(--board-pan-y)));
+  transition: width 420ms ease, transform 420ms ease;
 }
 
 .board-wrap.infinite-grid.zoom-close {
@@ -1109,6 +1112,14 @@ h3 {
 
 .board-wrap.infinite-grid.zoom-mid .board {
   width: min(164%, 900px);
+}
+
+.board-wrap.infinite-grid.zoom-far {
+  --grid-shift-y: clamp(56px, 9vw, 88px);
+}
+
+.board-wrap.infinite-grid.zoom-far .board {
+  width: min(126%, 740px);
 }
 
 .cell {
@@ -1361,6 +1372,48 @@ h3 {
   display: flex;
   flex-wrap: wrap;
   gap: 0.28rem;
+}
+
+.scrabble-breakdown {
+  text-align: left;
+}
+
+.scrabble-breakdown-grid {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(86px, 1fr));
+  gap: 0.35rem !important;
+}
+
+.scrabble-breakdown-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.42rem 0.5rem;
+  border-radius: 8px;
+  background: #fff6c4;
+}
+
+.scrabble-breakdown-row b,
+.scrabble-breakdown-row strong {
+  display: inline;
+  margin: 0;
+  color: var(--ink);
+  font-size: 0.9rem;
+}
+
+.scrabble-breakdown-row em {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-style: normal;
+  font-weight: 850;
+}
+
+.scrabble-breakdown p {
+  margin-top: 0.45rem;
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.28;
 }
 
 .workout-summary-list {

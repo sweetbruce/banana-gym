@@ -636,6 +636,9 @@ function setPracticeMode(mode) {
   state.practiceTimerSeconds = mode === "90" ? 90 : null;
   renderPracticeModeToggle();
   renderHome();
+  if (state.practiceTimerSeconds && hasGlobalScoresEnabled() && !hasArcadeProfile()) {
+    maybePromptArcadeProfile({ force: true });
+  }
 }
 
 function renderPracticeModeToggle() {
@@ -935,7 +938,8 @@ function openTimeTrialsMenu() {
 
 function maybePromptArcadeProfile({ force = false } = {}) {
   if (!els.arcadeProfileDialog?.showModal) return;
-  if (!force && (hasArcadeProfile() || state.stats.arcadeProfilePrompted)) return;
+  const shouldPrompt = force || (!hasArcadeProfile() && (hasGlobalScoresEnabled() || !state.stats.arcadeProfilePrompted));
+  if (!shouldPrompt) return;
   renderArcadeProfileDialog();
   state.stats.arcadeProfilePrompted = true;
   saveAll();
@@ -1211,7 +1215,7 @@ function loadDrill(id) {
   els.sessionExplainer.textContent = "";
   clearLearnHighlights();
   els.boardWrap.classList.toggle("hidden", !["glue", "flex", "peel", "rebuild", "learn"].includes(id));
-  els.boardWrap.classList.remove("zoom-close", "zoom-mid", "infinite-grid");
+  els.boardWrap.classList.remove("zoom-close", "zoom-mid", "zoom-far", "infinite-grid");
   els.boardWrap.classList.toggle("infinite-grid", ["peel", "flex"].includes(id) && (state.session.mode === "main" || state.session.timeLimitSeconds));
   window.scrollTo({ top: 0, behavior: "smooth" });
 
@@ -1528,11 +1532,32 @@ function renderTimeTrialSummaryDetails(session) {
       <em>${escapeHtml(`${formatDurationLabel(session.timeLimitSeconds)} ${session.timeTrialLabel || "Time Trial"}`)}</em>
       <p>${escapeHtml(bestInfo.isNew ? previousCopy : `${detail}. Score to beat: ${best?.score ?? 0}.`)}</p>
     </div>
+    ${session.timeTrialResult.mode === "scrabble" ? renderScrabbleScoreBreakdown(session.timeTrialResult) : ""}
     <div class="leaderboard-card">
       ${renderLeaderboardCard(session, `${formatDurationLabel(session.timeLimitSeconds)} ${session.timeTrialLabel || "Time Trial"}`, best?.score ?? session.timeTrialResult.score ?? 0)}
     </div>
   `;
   if (hasGlobalScoresEnabled()) syncLeaderboardPanel(session);
+}
+
+function renderScrabbleScoreBreakdown(result) {
+  const rows = result.letterBreakdown || [];
+  if (!rows.length) return "";
+  return `
+    <div class="summary-list scrabble-breakdown">
+      <strong>Scrabble-Style Breakdown</strong>
+      <div class="scrabble-breakdown-grid">
+        ${rows.map((item) => `
+          <span class="scrabble-breakdown-row">
+            <b>${escapeHtml(item.letter)}</b>
+            <em>${item.count} x ${item.value}</em>
+            <strong>${item.total}</strong>
+          </span>
+        `).join("")}
+      </div>
+      <p>Counts are based on scored letter uses across valid words, so shared crossing tiles may count in more than one word.</p>
+    </div>
+  `;
 }
 
 function renderDrillHighScoreSummary(session) {
@@ -1658,6 +1683,7 @@ function buildLeaderboardPayload(session) {
       metadata: {
         mode: session.timeTrialMode || result.mode || "letters",
         scrabble: result.scrabble || 0,
+        letterBreakdown: result.letterBreakdown || null,
         detail: getTimeTrialDetail(session)
       },
       created_at: new Date().toISOString()
@@ -1796,13 +1822,14 @@ function calculateTimeTrialResult(session) {
   const words = getValidBoardWords();
   const letters = session.lettersPlaced || 0;
   const invalid = session.invalidTiles || 0;
-  const scrabble = words.reduce((total, word) => total + getWordScore(word.text), 0);
+  const scrabbleBreakdown = getScrabbleLetterBreakdown(words);
+  const scrabble = scrabbleBreakdown.total;
 
   if (mode === "words") {
     return { mode, label: "Words", score: words.length, words: words.length, letters, invalid, scrabble };
   }
   if (mode === "scrabble") {
-    return { mode, label: "Score", score: scrabble, words: words.length, letters, invalid, scrabble };
+    return { mode, label: "Score", score: scrabble, words: words.length, letters, invalid, scrabble, letterBreakdown: scrabbleBreakdown.items };
   }
   if (mode === "flex") {
     const flexScore = session.flexScore || calculateFlexScore();
@@ -1827,6 +1854,26 @@ function getValidBoardWords() {
 
 function getWordScore(word) {
   return [...word].reduce((total, letter) => total + (SCRABBLE_TILE_VALUES[letter] || 0), 0);
+}
+
+function getScrabbleLetterBreakdown(words) {
+  const counts = {};
+  words.forEach((word) => {
+    [...word.text].forEach((letter) => {
+      counts[letter] = (counts[letter] || 0) + 1;
+    });
+  });
+  const items = Object.keys(counts)
+    .sort((a, b) => a.localeCompare(b))
+    .map((letter) => {
+      const count = counts[letter];
+      const value = SCRABBLE_TILE_VALUES[letter] || 0;
+      return { letter, count, value, total: count * value };
+    });
+  return {
+    items,
+    total: items.reduce((sum, item) => sum + item.total, 0)
+  };
 }
 
 function formatPercent(found, possible) {
@@ -3101,9 +3148,48 @@ function renderTiles() {
 function updateBoardZoom() {
   if (!els.boardWrap || els.boardWrap.classList.contains("hidden")) return;
   const zoomable = ["flex", "peel", "learn"].includes(state.session?.drillId);
-  const placed = getPlacedIndices().length;
-  els.boardWrap.classList.toggle("zoom-close", zoomable && placed < 8);
-  els.boardWrap.classList.toggle("zoom-mid", zoomable && placed >= 8 && placed < 18);
+  const placed = getPlacedIndices();
+  if (!zoomable || !placed.length) {
+    els.boardWrap.classList.toggle("zoom-close", zoomable);
+    els.boardWrap.classList.remove("zoom-mid", "zoom-far");
+    setBoardPan(0, 0);
+    return;
+  }
+
+  const rows = placed.map((index) => Math.floor(index / BOARD_SIZE));
+  const cols = placed.map((index) => index % BOARD_SIZE);
+  const minRow = Math.min(...rows);
+  const maxRow = Math.max(...rows);
+  const minCol = Math.min(...cols);
+  const maxCol = Math.max(...cols);
+  const span = Math.max(maxRow - minRow + 1, maxCol - minCol + 1);
+  const edgeDistance = Math.min(minRow, minCol, BOARD_SIZE - 1 - maxRow, BOARD_SIZE - 1 - maxCol);
+  const nearEdge = edgeDistance <= 2;
+  const zoomFar = nearEdge || span >= 8 || placed.length >= 22;
+  const zoomMid = !zoomFar && (span >= 5 || placed.length >= 8);
+
+  els.boardWrap.classList.toggle("zoom-close", !zoomMid && !zoomFar);
+  els.boardWrap.classList.toggle("zoom-mid", zoomMid);
+  els.boardWrap.classList.toggle("zoom-far", zoomFar);
+
+  const boardWidth = els.board.offsetWidth || 560;
+  const cellSize = boardWidth / BOARD_SIZE;
+  const boardCenter = (BOARD_SIZE - 1) / 2;
+  const centerCol = (minCol + maxCol) / 2;
+  const centerRow = (minRow + maxRow) / 2;
+  const panX = clampNumber((boardCenter - centerCol) * cellSize * 0.62, -boardWidth * 0.22, boardWidth * 0.22);
+  const panY = clampNumber((boardCenter - centerRow) * cellSize * 0.48, -92, 92);
+  setBoardPan(panX, panY);
+}
+
+function setBoardPan(x, y) {
+  if (!els.boardWrap) return;
+  els.boardWrap.style.setProperty("--board-pan-x", `${Math.round(x)}px`);
+  els.boardWrap.style.setProperty("--board-pan-y", `${Math.round(y)}px`);
+}
+
+function clampNumber(value, min, max) {
+  return Math.min(max, Math.max(min, value));
 }
 
 function updateFlexScore() {
