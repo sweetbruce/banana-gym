@@ -30,7 +30,11 @@ const TIME_TRIAL_DURATIONS = [120, 300];
 const LEADERBOARD_LIMIT = 10;
 const LEADERBOARD_TABLE = "banana_gym_scores";
 const LEADERBOARD_CONFIG = globalThis.BANANA_GYM_LEADERBOARD || {};
-const ARCADE_EMOJIS = [0x1F34C, 0x1F3C6, 0x2B50, 0x1F525, 0x1F9E0, 0x1F4AA, 0x1F31F].map((code) => String.fromCodePoint(code));
+const ARCADE_EMOJIS = [
+  ...[0x1F34C, 0x1F3C6, 0x2B50, 0x1F525, 0x1F9E0, 0x1F4AA, 0x1F31F].map((code) => String.fromCodePoint(code)),
+  ...["US", "CA", "GB", "AU", "NZ", "IE", "MX", "BR", "JP", "KR"].map(makeFlagEmoji),
+  ...[0x1F436, 0x1F431, 0x1F600, 0x1F60E, 0x1F929, 0x1F973, 0x1F680, 0x26A1, 0x1F3AF, 0x1F3AE, 0x1F3C0, 0x26BD, 0x1F3D2, 0x1F9E9, 0x1F355, 0x1F308, 0x1F48E].map((code) => String.fromCodePoint(code))
+];
 
 const TIME_TRIAL_MODES = [
   {
@@ -437,12 +441,19 @@ const els = {
 init();
 
 function init() {
+  renderEmojiOptions();
   renderHome();
   renderSettings();
   renderDictionaryStatus();
   initBoard();
   bindEvents();
   startSplashIntro();
+}
+
+function makeFlagEmoji(countryCode) {
+  return [...countryCode.toUpperCase()]
+    .map((char) => String.fromCodePoint(0x1F1E6 + char.charCodeAt(0) - 65))
+    .join("");
 }
 
 function startSplashIntro() {
@@ -1014,6 +1025,15 @@ function renderSettings() {
     els.drillSettings.append(label);
   });
   renderDictionaryStatus();
+}
+
+function renderEmojiOptions() {
+  [els.playerEmojiSelect, els.arcadeEmojiSelect].forEach((select) => {
+    if (!select) return;
+    select.innerHTML = ARCADE_EMOJIS
+      .map((emoji) => `<option value="${escapeHtml(emoji)}">${escapeHtml(emoji)}</option>`)
+      .join("");
+  });
 }
 
 function renderDictionaryStatus() {
